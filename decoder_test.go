@@ -17,6 +17,7 @@ func TestDecodeSamples(t *testing.T) {
 		inventory    int
 		materials    int
 		recipes      int
+		playerLength uint32
 		remainingMax int
 	}{
 		{
@@ -26,6 +27,7 @@ func TestDecodeSamples(t *testing.T) {
 			inventory:    16,
 			materials:    108,
 			recipes:      35,
+			playerLength: 7593,
 			remainingMax: 16,
 		},
 		{
@@ -35,6 +37,7 @@ func TestDecodeSamples(t *testing.T) {
 			inventory:    16,
 			materials:    141,
 			recipes:      54,
+			playerLength: 10122,
 			remainingMax: 16,
 		},
 	}
@@ -74,6 +77,21 @@ func TestDecodeSamples(t *testing.T) {
 			}
 			if got.Player.GuardianPower.Name != "GP_Eikthyr" {
 				t.Fatalf("GuardianPower = %q", got.Player.GuardianPower.Name)
+			}
+			if !got.Player.HasPlayerData {
+				t.Fatal("HasPlayerData = false, want true")
+			}
+			if got.Player.PlayerDataLength != tt.playerLength {
+				t.Fatalf("PlayerDataLength = %d, want %d", got.Player.PlayerDataLength, tt.playerLength)
+			}
+			if got.Player.PlayerVersion != 29 {
+				t.Fatalf("PlayerVersion = %d, want 29", got.Player.PlayerVersion)
+			}
+			if got.Player.Health <= 0 || got.Player.MaxHealth <= 0 || got.Player.MaxStamina <= 0 {
+				t.Fatalf("bad player vitals: health=%v maxHealth=%v maxStamina=%v", got.Player.Health, got.Player.MaxHealth, got.Player.MaxStamina)
+			}
+			if got.Player.InventoryVersion != 106 {
+				t.Fatalf("InventoryVersion = %d, want 106", got.Player.InventoryVersion)
 			}
 			if len(got.Player.Inventory) != tt.inventory {
 				t.Fatalf("Inventory = %d, want %d", len(got.Player.Inventory), tt.inventory)

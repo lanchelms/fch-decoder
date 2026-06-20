@@ -10,7 +10,7 @@ The decoder currently reads:
 - player name and player ID
 - per-world key/value entries
 - known text, enemy, material, and recipe stat arrays
-- equipped guardian power block
+- player health/stamina state and equipped guardian power
 - inventory item records
 - player skill records
 

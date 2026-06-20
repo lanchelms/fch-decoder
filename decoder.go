@@ -37,20 +37,28 @@ type Trailer struct {
 }
 
 type PlayerData struct {
-	Name          string        `json:"name"`
-	PlayerID      uint64        `json:"playerId"`
-	UnknownA      uint32        `json:"unknownA"`
-	UnknownB      uint32        `json:"unknownB"`
-	UnknownFlags  []bool        `json:"unknownFlags"`
-	Worlds        []WorldData   `json:"worlds"`
-	KnownTexts    []StatEntry   `json:"knownTexts,omitempty"`
-	EnemyStats    []StatEntry   `json:"enemyStats,omitempty"`
-	MaterialStats []StatEntry   `json:"materialStats,omitempty"`
-	RecipeStats   []StatEntry   `json:"recipeStats,omitempty"`
-	GuardianPower GuardianPower `json:"guardianPower"`
-	Inventory     []Item        `json:"inventory,omitempty"`
-	SkillVersion  uint32        `json:"skillVersion,omitempty"`
-	Skills        []Skill       `json:"skills,omitempty"`
+	Name             string        `json:"name"`
+	PlayerID         uint64        `json:"playerId"`
+	UnknownA         uint32        `json:"unknownA"`
+	UnknownB         uint32        `json:"unknownB"`
+	UnknownFlags     []bool        `json:"unknownFlags"`
+	Worlds           []WorldData   `json:"worlds"`
+	KnownTexts       []StatEntry   `json:"knownTexts,omitempty"`
+	EnemyStats       []StatEntry   `json:"enemyStats,omitempty"`
+	MaterialStats    []StatEntry   `json:"materialStats,omitempty"`
+	RecipeStats      []StatEntry   `json:"recipeStats,omitempty"`
+	GuardianPower    GuardianPower `json:"guardianPower"`
+	HasPlayerData    bool          `json:"hasPlayerData"`
+	PlayerDataLength uint32        `json:"playerDataLength"`
+	PlayerVersion    uint32        `json:"playerVersion"`
+	MaxHealth        float32       `json:"maxHealth"`
+	Health           float32       `json:"health"`
+	MaxStamina       float32       `json:"maxStamina"`
+	TimeSinceDeath   float32       `json:"timeSinceDeath"`
+	InventoryVersion uint32        `json:"inventoryVersion"`
+	Inventory        []Item        `json:"inventory,omitempty"`
+	SkillVersion     uint32        `json:"skillVersion,omitempty"`
+	Skills           []Skill       `json:"skills,omitempty"`
 }
 
 type WorldData struct {
@@ -65,13 +73,8 @@ type StatEntry struct {
 }
 
 type GuardianPower struct {
-	UnknownBool   bool      `json:"unknownBool"`
-	UnknownIntA   uint32    `json:"unknownIntA"`
-	UnknownIntB   uint32    `json:"unknownIntB"`
-	UnknownFloats []float32 `json:"unknownFloats"`
-	Name          string    `json:"name"`
-	Cooldown      float32   `json:"cooldown"`
-	UnknownIntC   uint32    `json:"unknownIntC"`
+	Name     string  `json:"name"`
+	Cooldown float32 `json:"cooldown"`
 }
 
 type Skill struct {
@@ -193,7 +196,7 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.EnemyStats = readStatEntries(r)
 	p.MaterialStats = readStatEntries(r)
 	p.RecipeStats = readStatEntries(r)
-	p.GuardianPower = readGuardianPower(r)
+	readPlayerState(r, &p)
 	p.Inventory = readInventory(r)
 	readPlayerTail(r, &p)
 	if r.err != nil {
@@ -338,17 +341,19 @@ func skillName(skillType int32) string {
 	}
 }
 
-func readGuardianPower(r *reader) GuardianPower {
-	g := GuardianPower{
-		UnknownBool:   r.bool(),
-		UnknownIntA:   r.u32(),
-		UnknownIntB:   r.u32(),
-		UnknownFloats: []float32{r.f32(), r.f32(), r.f32(), r.f32()},
-		Name:          r.str(),
-		Cooldown:      r.f32(),
-		UnknownIntC:   r.u32(),
+func readPlayerState(r *reader, p *PlayerData) {
+	p.HasPlayerData = r.bool()
+	p.PlayerDataLength = r.u32()
+	p.PlayerVersion = r.u32()
+	p.MaxHealth = r.f32()
+	p.Health = r.f32()
+	p.MaxStamina = r.f32()
+	p.TimeSinceDeath = r.f32()
+	p.GuardianPower = GuardianPower{
+		Name:     r.str(),
+		Cooldown: r.f32(),
 	}
-	return g
+	p.InventoryVersion = r.u32()
 }
 
 func readInventory(r *reader) []Item {
