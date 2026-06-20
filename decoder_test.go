@@ -61,6 +61,23 @@ func TestDecodeSamples(t *testing.T) {
 			dateCreatedUnix: 1780113600,
 			playerLength:    10122,
 		},
+		{
+			file:            "Steam_76561197962555781_tugen.fch",
+			name:            "Tugen",
+			playerID:        18446744072835061465,
+			inventory:       23,
+			materials:       126,
+			recipes:         43,
+			knownMaterials:  130,
+			knownRecipes:    226,
+			uniques:         3,
+			trophies:        11,
+			beard:           "",
+			hair:            "",
+			modelIndex:      0,
+			dateCreatedUnix: 1780027200,
+			playerLength:    10262,
+		},
 	}
 
 	for _, tt := range tests {
