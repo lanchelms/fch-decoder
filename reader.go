@@ -89,6 +89,15 @@ func (r *reader) str() string {
 	return string(b)
 }
 
+func (r *reader) stringList() []string {
+	count := r.u32()
+	out := make([]string, 0, count)
+	for i := uint32(0); i < count; i++ {
+		out = append(out, r.str())
+	}
+	return out
+}
+
 func (r *reader) read7BitEncodedInt() int {
 	var count uint32
 	var shift uint

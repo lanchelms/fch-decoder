@@ -212,16 +212,16 @@ func readStatEntries(r *reader) []StatEntry {
 }
 
 func readPlayerTail(r *reader, p *PlayerData) {
-	readStringList(r) // known recipes
+	r.stringList() // known recipes
 	stationCount := r.u32()
 	for i := uint32(0); i < stationCount; i++ {
 		r.str()
 		r.u32()
 	}
-	readStringList(r) // known materials
-	readStringList(r) // shown tutorials
-	readStringList(r) // uniques
-	readStringList(r) // trophies
+	r.stringList() // known materials
+	r.stringList() // shown tutorials
+	r.stringList() // uniques
+	r.stringList() // trophies
 
 	biomeCount := r.u32()
 	for i := uint32(0); i < biomeCount; i++ {
@@ -267,15 +267,6 @@ func readPlayerTail(r *reader, p *PlayerData) {
 		r.str()
 		r.str()
 	}
-}
-
-func readStringList(r *reader) []string {
-	count := r.u32()
-	out := make([]string, 0, count)
-	for i := uint32(0); i < count; i++ {
-		out = append(out, r.str())
-	}
-	return out
 }
 
 func skillName(skillType int32) string {
