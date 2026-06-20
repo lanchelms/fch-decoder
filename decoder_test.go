@@ -1,8 +1,10 @@
 package fch
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -74,6 +76,13 @@ func TestDecodeSamples(t *testing.T) {
 			}
 			if got.Player.Inventory[0].Name == "" {
 				t.Fatal("first inventory item has empty name")
+			}
+			inventoryJSON, err := json.Marshal(got.Player.Inventory[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(inventoryJSON), "unknownTail") || strings.Contains(string(inventoryJSON), "unknownByte") {
+				t.Fatalf("inventory item JSON includes placeholder fields: %s", inventoryJSON)
 			}
 			if len(got.Player.MaterialStats) != tt.materials {
 				t.Fatalf("MaterialStats = %d, want %d", len(got.Player.MaterialStats), tt.materials)

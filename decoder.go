@@ -83,8 +83,6 @@ type Item struct {
 	Variant     int32   `json:"variant"`
 	CrafterID   uint64  `json:"crafterId"`
 	CrafterName string  `json:"crafterName"`
-	UnknownTail uint64  `json:"unknownTail"`
-	UnknownByte byte    `json:"unknownByte"`
 }
 
 func Decode(r io.Reader) (*Character, error) {
@@ -220,7 +218,7 @@ func readInventory(r *reader) []Item {
 	count := r.u32()
 	out := make([]Item, 0, count)
 	for i := uint32(0); i < count; i++ {
-		out = append(out, Item{
+		item := Item{
 			Name:        r.str(),
 			Stack:       r.i32(),
 			Durability:  r.f32(),
@@ -231,9 +229,10 @@ func readInventory(r *reader) []Item {
 			Variant:     r.i32(),
 			CrafterID:   r.u64(),
 			CrafterName: r.str(),
-			UnknownTail: r.u64(),
-			UnknownByte: r.byte(),
-		})
+		}
+		r.u64()
+		r.byte()
+		out = append(out, item)
 	}
 	return out
 }
