@@ -11,37 +11,43 @@ import (
 
 func TestDecodeSamples(t *testing.T) {
 	tests := []struct {
-		file         string
-		name         string
-		playerID     uint64
-		inventory    int
-		materials    int
-		recipes      int
-		worldID      uint64
-		playerLength uint32
-		remainingMax int
+		file           string
+		name           string
+		playerID       uint64
+		inventory      int
+		materials      int
+		recipes        int
+		knownMaterials int
+		knownRecipes   int
+		worldID        uint64
+		playerLength   uint32
+		remainingMax   int
 	}{
 		{
-			file:         "Steam_76561197968487130_fenris bueller.fch",
-			name:         "Fenris Bueller",
-			playerID:     3289368200,
-			inventory:    16,
-			materials:    108,
-			recipes:      35,
-			worldID:      455686963200,
-			playerLength: 7593,
-			remainingMax: 16,
+			file:           "Steam_76561197968487130_fenris bueller.fch",
+			name:           "Fenris Bueller",
+			playerID:       3289368200,
+			inventory:      16,
+			materials:      108,
+			recipes:        35,
+			knownMaterials: 117,
+			knownRecipes:   189,
+			worldID:        455686963200,
+			playerLength:   7593,
+			remainingMax:   16,
 		},
 		{
-			file:         "Steam_76561198018104185_bortson.fch",
-			name:         "Bortson",
-			playerID:     1835310974,
-			inventory:    16,
-			materials:    141,
-			recipes:      54,
-			worldID:      455709081600,
-			playerLength: 10122,
-			remainingMax: 16,
+			file:           "Steam_76561198018104185_bortson.fch",
+			name:           "Bortson",
+			playerID:       1835310974,
+			inventory:      16,
+			materials:      141,
+			recipes:        54,
+			knownMaterials: 143,
+			knownRecipes:   197,
+			worldID:        455709081600,
+			playerLength:   10122,
+			remainingMax:   16,
 		},
 	}
 
@@ -154,6 +160,12 @@ func TestDecodeSamples(t *testing.T) {
 			}
 			if len(got.Player.RecipeStats) != tt.recipes {
 				t.Fatalf("RecipeStats = %d, want %d", len(got.Player.RecipeStats), tt.recipes)
+			}
+			if len(got.Player.KnownMaterials) != tt.knownMaterials {
+				t.Fatalf("KnownMaterials = %d, want %d", len(got.Player.KnownMaterials), tt.knownMaterials)
+			}
+			if len(got.Player.KnownRecipes) != tt.knownRecipes {
+				t.Fatalf("KnownRecipes = %d, want %d", len(got.Player.KnownRecipes), tt.knownRecipes)
 			}
 			if got.Map.UncompressedLength == 0 {
 				t.Fatal("map was not decompressed")

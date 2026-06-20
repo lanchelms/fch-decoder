@@ -57,6 +57,8 @@ type PlayerData struct {
 	TimeSinceDeath   float32       `json:"timeSinceDeath"`
 	InventoryVersion uint32        `json:"inventoryVersion"`
 	Inventory        []Item        `json:"inventory,omitempty"`
+	KnownRecipes     []string      `json:"knownRecipes,omitempty"`
+	KnownMaterials   []string      `json:"knownMaterials,omitempty"`
 	SkillVersion     uint32        `json:"skillVersion,omitempty"`
 	Skills           []Skill       `json:"skills,omitempty"`
 }
@@ -215,13 +217,13 @@ func readStatEntries(r *reader) []StatEntry {
 }
 
 func readPlayerTail(r *reader, p *PlayerData) {
-	r.stringList() // known recipes
+	p.KnownRecipes = r.stringList()
 	stationCount := r.u32()
 	for i := uint32(0); i < stationCount; i++ {
 		r.str()
 		r.u32()
 	}
-	r.stringList() // known materials
+	p.KnownMaterials = r.stringList()
 	r.stringList() // shown tutorials
 	r.stringList() // uniques
 	r.stringList() // trophies

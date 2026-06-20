@@ -10,9 +10,17 @@ The decoder currently reads:
 - player name and player ID
 - per-world key/value entries
 - known text, enemy, material, and recipe stat arrays
+- known material and recipe lists
 - player health/stamina state and equipped guardian power
 - inventory item records
 - player skill records
+
+`materialStats` and `recipeStats` are the raw per-item stat counters saved in
+the character file. They are not current inventory contents, and evidence from
+stack-producing items suggests they should not be interpreted as lifetime item
+quantities either. For example, crafted arrows and food can have stat values far
+below the number of items produced because the game appears to count stat events
+rather than stack amounts.
 
 Most tail sections after inventory are consumed to reach the skill records. A small end-of-player fragment is still kept as `RemainingBytes` until those bytes are identified.
 
