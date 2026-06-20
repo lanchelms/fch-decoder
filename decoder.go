@@ -11,14 +11,14 @@ import (
 const trailerSize = 72
 
 type Character struct {
-	FileLength       uint32     `json:"fileLength"`
-	Version          uint32     `json:"version"`
-	PlayerStatCount  uint32     `json:"playerStatCount"`
-	PlayerStatValues []float32  `json:"playerStatValues,omitempty"`
-	Map              MapSection `json:"map"`
-	Player           PlayerData `json:"player"`
-	Trailer          Trailer    `json:"trailer"`
-	RemainingBytes   int        `json:"remainingBytes"`
+	FileLength      uint32      `json:"fileLength"`
+	Version         uint32      `json:"version"`
+	PlayerStatCount uint32      `json:"playerStatCount"`
+	PlayerStats     []StatEntry `json:"playerStats,omitempty"`
+	Map             MapSection  `json:"map"`
+	Player          PlayerData  `json:"player"`
+	Trailer         Trailer     `json:"trailer"`
+	RemainingBytes  int         `json:"remainingBytes"`
 }
 
 type MapSection struct {
@@ -38,10 +38,11 @@ type PlayerData struct {
 	Name             string        `json:"name"`
 	PlayerID         uint64        `json:"playerId"`
 	StartSeed        string        `json:"startSeed"`
-	WorldID          uint64        `json:"worldId"`
-	UnknownFlag      bool          `json:"unknownFlag"`
-	Worlds           []WorldData   `json:"worlds"`
-	KnownTexts       []StatEntry   `json:"knownTexts,omitempty"`
+	UsedCheats       bool          `json:"usedCheats"`
+	DateCreatedUnix  int64         `json:"dateCreatedUnix"`
+	KnownWorlds      []StatEntry   `json:"knownWorlds,omitempty"`
+	KnownWorldKeys   []StatEntry   `json:"knownWorldKeys,omitempty"`
+	KnownCommands    []StatEntry   `json:"knownCommands,omitempty"`
 	EnemyStats       []StatEntry   `json:"enemyStats,omitempty"`
 	MaterialStats    []StatEntry   `json:"materialStats,omitempty"`
 	RecipeStats      []StatEntry   `json:"recipeStats,omitempty"`
@@ -52,29 +53,55 @@ type PlayerData struct {
 	MaxHealth        float32       `json:"maxHealth"`
 	Health           float32       `json:"health"`
 	MaxStamina       float32       `json:"maxStamina"`
+	Stamina          float32       `json:"stamina"`
+	MaxEitr          float32       `json:"maxEitr"`
+	Eitr             float32       `json:"eitr"`
 	TimeSinceDeath   float32       `json:"timeSinceDeath"`
 	InventoryVersion uint32        `json:"inventoryVersion"`
 	Inventory        []Item        `json:"inventory,omitempty"`
 	KnownRecipes     []string      `json:"knownRecipes,omitempty"`
+	KnownStations    []Station     `json:"knownStations,omitempty"`
 	KnownMaterials   []string      `json:"knownMaterials,omitempty"`
+	ShownTutorials   []string      `json:"shownTutorials,omitempty"`
 	Uniques          []string      `json:"uniques,omitempty"`
 	Trophies         []string      `json:"trophies,omitempty"`
+	KnownBiomes      []uint32      `json:"knownBiomes,omitempty"`
+	PlayerKnownTexts []TextEntry   `json:"playerKnownTexts,omitempty"`
 	Beard            string        `json:"beard,omitempty"`
 	Hair             string        `json:"hair,omitempty"`
+	SkinColor        Vector3       `json:"skinColor"`
+	HairColor        Vector3       `json:"hairColor"`
 	ModelIndex       uint32        `json:"modelIndex"`
+	Foods            []Food        `json:"foods,omitempty"`
 	SkillVersion     uint32        `json:"skillVersion,omitempty"`
 	Skills           []Skill       `json:"skills,omitempty"`
-}
-
-type WorldData struct {
-	Name    string      `json:"name"`
-	Time    float32     `json:"time"`
-	Entries []StatEntry `json:"entries,omitempty"`
+	CustomData       []TextEntry   `json:"customData,omitempty"`
 }
 
 type StatEntry struct {
 	Name  string  `json:"name"`
 	Value float32 `json:"value"`
+}
+
+type TextEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type Station struct {
+	Name  string `json:"name"`
+	Level uint32 `json:"level"`
+}
+
+type Food struct {
+	Name string  `json:"name"`
+	Time float32 `json:"time"`
+}
+
+type Vector3 struct {
+	X float32 `json:"x"`
+	Y float32 `json:"y"`
+	Z float32 `json:"z"`
 }
 
 type GuardianPower struct {
@@ -91,16 +118,19 @@ type Skill struct {
 }
 
 type Item struct {
-	Name        string  `json:"name"`
-	Stack       int32   `json:"stack"`
-	Durability  float32 `json:"durability"`
-	GridX       int32   `json:"gridX"`
-	GridY       int32   `json:"gridY"`
-	Equipped    bool    `json:"equipped"`
-	Quality     int32   `json:"quality"`
-	Variant     int32   `json:"variant"`
-	CrafterID   uint64  `json:"crafterId"`
-	CrafterName string  `json:"crafterName"`
+	Name        string      `json:"name"`
+	Stack       int32       `json:"stack"`
+	Durability  float32     `json:"durability"`
+	GridX       int32       `json:"gridX"`
+	GridY       int32       `json:"gridY"`
+	Equipped    bool        `json:"equipped"`
+	Quality     int32       `json:"quality"`
+	Variant     int32       `json:"variant"`
+	CrafterID   uint64      `json:"crafterId"`
+	CrafterName string      `json:"crafterName"`
+	CustomData  []TextEntry `json:"customData,omitempty"`
+	WorldLevel  uint32      `json:"worldLevel"`
+	PickedUp    bool        `json:"pickedUp"`
 }
 
 func Decode(r io.Reader) (*Character, error) {
@@ -128,9 +158,10 @@ func DecodeBytes(data []byte) (*Character, error) {
 		return nil, fmt.Errorf("fch: length header %d does not match file size %d", c.FileLength, len(data))
 	}
 
-	c.PlayerStatValues = make([]float32, int(c.PlayerStatCount))
-	for i := range c.PlayerStatValues {
-		c.PlayerStatValues[i] = rd.f32()
+	c.PlayerStats = make([]StatEntry, 0, c.PlayerStatCount)
+	for i := 0; i < int(c.PlayerStatCount); i++ {
+		value := rd.f32()
+		c.PlayerStats = append(c.PlayerStats, StatEntry{Name: playerStatName(i), Value: value})
 	}
 
 	mapSection, playerOffset, err := readMapSection(data, rd.pos)
@@ -190,18 +221,12 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.Name = r.str()
 	p.PlayerID = r.u64()
 	p.StartSeed = r.str()
-	p.WorldID = r.u64()
-	p.UnknownFlag = r.bool()
+	p.UsedCheats = r.bool()
+	p.DateCreatedUnix = int64(r.u64())
 
-	worldCount := r.u32()
-	p.Worlds = make([]WorldData, 0, worldCount)
-	for range worldCount {
-		w := WorldData{Name: r.str(), Time: r.f32()}
-		w.Entries = readStatEntries(r)
-		p.Worlds = append(p.Worlds, w)
-	}
-
-	p.KnownTexts = readStatEntries(r)
+	p.KnownWorlds = readStatEntries(r)
+	p.KnownWorldKeys = readStatEntries(r)
+	p.KnownCommands = readStatEntries(r)
 	p.EnemyStats = readStatEntries(r)
 	p.MaterialStats = readStatEntries(r)
 	p.RecipeStats = readStatEntries(r)
@@ -226,37 +251,37 @@ func readStatEntries(r *reader) []StatEntry {
 func readPlayerTail(r *reader, p *PlayerData) {
 	p.KnownRecipes = r.stringList()
 	stationCount := r.u32()
+	p.KnownStations = make([]Station, 0, stationCount)
 	for range stationCount {
-		r.str()
-		r.u32()
+		p.KnownStations = append(p.KnownStations, Station{Name: r.str(), Level: r.u32()})
 	}
 	p.KnownMaterials = r.stringList()
-	r.stringList() // shown tutorials
+	p.ShownTutorials = r.stringList()
 	p.Uniques = r.stringList()
 	p.Trophies = r.stringList()
 
 	biomeCount := r.u32()
+	p.KnownBiomes = make([]uint32, 0, biomeCount)
 	for range biomeCount {
-		r.u32()
+		p.KnownBiomes = append(p.KnownBiomes, r.u32())
 	}
 
 	knownTextCount := r.u32()
+	p.PlayerKnownTexts = make([]TextEntry, 0, knownTextCount)
 	for range knownTextCount {
-		r.str()
-		r.str()
+		p.PlayerKnownTexts = append(p.PlayerKnownTexts, TextEntry{Key: r.str(), Value: r.str()})
 	}
 
 	p.Beard = r.str()
 	p.Hair = r.str()
-	for range 6 {
-		r.f32()
-	}
+	p.SkinColor = r.vector3()
+	p.HairColor = r.vector3()
 	p.ModelIndex = r.u32()
 
 	foodCount := r.u32()
+	p.Foods = make([]Food, 0, foodCount)
 	for range foodCount {
-		r.str()
-		r.f32()
+		p.Foods = append(p.Foods, Food{Name: r.str(), Time: r.f32()})
 	}
 
 	p.SkillVersion = r.u32()
@@ -275,9 +300,16 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	}
 
 	customDataCount := r.u32()
+	p.CustomData = make([]TextEntry, 0, customDataCount)
 	for range customDataCount {
-		r.str()
-		r.str()
+		p.CustomData = append(p.CustomData, TextEntry{Key: r.str(), Value: r.str()})
+	}
+	if r.remaining() >= 8 {
+		p.Stamina = r.f32()
+		p.MaxEitr = r.f32()
+	}
+	if r.remaining() >= 4 {
+		p.Eitr = r.f32()
 	}
 }
 
@@ -345,9 +377,129 @@ func readInventory(r *reader) []Item {
 			CrafterID:   r.u64(),
 			CrafterName: r.str(),
 		}
-		r.u64()
-		r.byte()
+		customDataCount := r.u32()
+		item.CustomData = make([]TextEntry, 0, customDataCount)
+		for range customDataCount {
+			item.CustomData = append(item.CustomData, TextEntry{Key: r.str(), Value: r.str()})
+		}
+		item.WorldLevel = r.u32()
+		item.PickedUp = r.bool()
 		out = append(out, item)
 	}
 	return out
+}
+
+func playerStatName(index int) string {
+	if index < 0 || index >= len(playerStatNames) {
+		return ""
+	}
+	return playerStatNames[index]
+}
+
+var playerStatNames = []string{
+	"Deaths",
+	"CraftsOrUpgrades",
+	"Builds",
+	"Jumps",
+	"Cheats",
+	"EnemyHits",
+	"EnemyKills",
+	"EnemyKillsLastHits",
+	"PlayerHits",
+	"PlayerKills",
+	"HitsTakenEnemies",
+	"HitsTakenPlayers",
+	"ItemsPickedUp",
+	"Crafts",
+	"Upgrades",
+	"PortalsUsed",
+	"DistanceTraveled",
+	"DistanceWalk",
+	"DistanceRun",
+	"DistanceSail",
+	"DistanceAir",
+	"TimeInBase",
+	"TimeOutOfBase",
+	"Sleep",
+	"ItemStandUses",
+	"ArmorStandUses",
+	"WorldLoads",
+	"TreeChops",
+	"Tree",
+	"TreeTier0",
+	"TreeTier1",
+	"TreeTier2",
+	"TreeTier3",
+	"TreeTier4",
+	"TreeTier5",
+	"LogChops",
+	"Logs",
+	"MineHits",
+	"Mines",
+	"MineTier0",
+	"MineTier1",
+	"MineTier2",
+	"MineTier3",
+	"MineTier4",
+	"MineTier5",
+	"RavenHits",
+	"RavenTalk",
+	"RavenAppear",
+	"CreatureTamed",
+	"FoodEaten",
+	"SkeletonSummons",
+	"ArrowsShot",
+	"TombstonesOpenedOwn",
+	"TombstonesOpenedOther",
+	"TombstonesFit",
+	"DeathByUndefined",
+	"DeathByEnemyHit",
+	"DeathByPlayerHit",
+	"DeathByFall",
+	"DeathByDrowning",
+	"DeathByBurning",
+	"DeathByFreezing",
+	"DeathByPoisoned",
+	"DeathBySmoke",
+	"DeathByWater",
+	"DeathByEdgeOfWorld",
+	"DeathByImpact",
+	"DeathByCart",
+	"DeathByTree",
+	"DeathBySelf",
+	"DeathByStructural",
+	"DeathByTurret",
+	"DeathByBoat",
+	"DeathByStalagtite",
+	"DoorsOpened",
+	"DoorsClosed",
+	"BeesHarvested",
+	"SapHarvested",
+	"TurretAmmoAdded",
+	"TurretTrophySet",
+	"TrapArmed",
+	"TrapTriggered",
+	"PlaceStacks",
+	"PortalDungeonIn",
+	"PortalDungeonOut",
+	"BossKills",
+	"BossLastHits",
+	"SetGuardianPower",
+	"SetPowerEikthyr",
+	"SetPowerElder",
+	"SetPowerBonemass",
+	"SetPowerModer",
+	"SetPowerYagluth",
+	"SetPowerQueen",
+	"SetPowerAshlands",
+	"SetPowerDeepNorth",
+	"UseGuardianPower",
+	"UsePowerEikthyr",
+	"UsePowerElder",
+	"UsePowerBonemass",
+	"UsePowerModer",
+	"UsePowerYagluth",
+	"UsePowerQueen",
+	"UsePowerAshlands",
+	"UsePowerDeepNorth",
 }

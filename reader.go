@@ -98,6 +98,10 @@ func (r *reader) stringList() []string {
 	return out
 }
 
+func (r *reader) vector3() Vector3 {
+	return Vector3{X: r.f32(), Y: r.f32(), Z: r.f32()}
+}
+
 func (r *reader) read7BitEncodedInt() int {
 	var count uint32
 	var shift uint

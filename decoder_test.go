@@ -11,58 +11,55 @@ import (
 
 func TestDecodeSamples(t *testing.T) {
 	tests := []struct {
-		file           string
-		name           string
-		playerID       uint64
-		inventory      int
-		materials      int
-		recipes        int
-		knownMaterials int
-		knownRecipes   int
-		uniques        int
-		trophies       int
-		beard          string
-		hair           string
-		modelIndex     uint32
-		worldID        uint64
-		playerLength   uint32
-		remainingMax   int
+		file            string
+		name            string
+		playerID        uint64
+		inventory       int
+		materials       int
+		recipes         int
+		knownMaterials  int
+		knownRecipes    int
+		uniques         int
+		trophies        int
+		beard           string
+		hair            string
+		modelIndex      uint32
+		dateCreatedUnix int64
+		playerLength    uint32
 	}{
 		{
-			file:           "Steam_76561197968487130_fenris bueller.fch",
-			name:           "Fenris Bueller",
-			playerID:       3289368200,
-			inventory:      16,
-			materials:      108,
-			recipes:        35,
-			knownMaterials: 117,
-			knownRecipes:   189,
-			uniques:        4,
-			trophies:       10,
-			beard:          "Beard23",
-			hair:           "Hair33",
-			modelIndex:     0,
-			worldID:        455686963200,
-			playerLength:   7593,
-			remainingMax:   16,
+			file:            "Steam_76561197968487130_fenris bueller.fch",
+			name:            "Fenris Bueller",
+			playerID:        3289368200,
+			inventory:       16,
+			materials:       108,
+			recipes:         35,
+			knownMaterials:  117,
+			knownRecipes:    189,
+			uniques:         4,
+			trophies:        10,
+			beard:           "Beard23",
+			hair:            "Hair33",
+			modelIndex:      0,
+			dateCreatedUnix: 1780027200,
+			playerLength:    7593,
 		},
 		{
-			file:           "Steam_76561198018104185_bortson.fch",
-			name:           "Bortson",
-			playerID:       1835310974,
-			inventory:      16,
-			materials:      141,
-			recipes:        54,
-			knownMaterials: 143,
-			knownRecipes:   197,
-			uniques:        4,
-			trophies:       13,
-			beard:          "",
-			hair:           "Hair18",
-			modelIndex:     0,
-			worldID:        455709081600,
-			playerLength:   10122,
-			remainingMax:   16,
+			file:            "Steam_76561198018104185_bortson.fch",
+			name:            "Bortson",
+			playerID:        1835310974,
+			inventory:       16,
+			materials:       141,
+			recipes:         54,
+			knownMaterials:  143,
+			knownRecipes:    197,
+			uniques:         4,
+			trophies:        13,
+			beard:           "",
+			hair:            "Hair18",
+			modelIndex:      0,
+			dateCreatedUnix: 1780113600,
+			playerLength:    10122,
 		},
 	}
 
@@ -84,8 +81,11 @@ func TestDecodeSamples(t *testing.T) {
 			if got.PlayerStatCount != 105 {
 				t.Fatalf("PlayerStatCount = %d, want 105", got.PlayerStatCount)
 			}
-			if len(got.PlayerStatValues) != int(got.PlayerStatCount) {
-				t.Fatalf("PlayerStatValues = %d, want %d", len(got.PlayerStatValues), got.PlayerStatCount)
+			if len(got.PlayerStats) != int(got.PlayerStatCount) {
+				t.Fatalf("PlayerStats = %d, want %d", len(got.PlayerStats), got.PlayerStatCount)
+			}
+			if got.PlayerStats[0].Name != "Deaths" || got.PlayerStats[104].Name != "UsePowerDeepNorth" {
+				t.Fatalf("bad player stat names: first=%q last=%q", got.PlayerStats[0].Name, got.PlayerStats[104].Name)
 			}
 			if got.Player.Name != tt.name {
 				t.Fatalf("Name = %q, want %q", got.Player.Name, tt.name)
@@ -96,17 +96,20 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Player.StartSeed != "" {
 				t.Fatalf("StartSeed = %q, want empty", got.Player.StartSeed)
 			}
-			if got.Player.WorldID != tt.worldID {
-				t.Fatalf("WorldID = %d, want %d", got.Player.WorldID, tt.worldID)
+			if got.Player.DateCreatedUnix != tt.dateCreatedUnix {
+				t.Fatalf("DateCreatedUnix = %d, want %d", got.Player.DateCreatedUnix, tt.dateCreatedUnix)
 			}
-			if got.Player.UnknownFlag {
-				t.Fatal("UnknownFlag = true, want false")
+			if got.Player.UsedCheats {
+				t.Fatal("UsedCheats = true, want false")
 			}
-			if len(got.Player.Worlds) != 1 {
-				t.Fatalf("Worlds = %d, want 1", len(got.Player.Worlds))
+			if len(got.Player.KnownWorlds) != 1 {
+				t.Fatalf("KnownWorlds = %d, want 1", len(got.Player.KnownWorlds))
 			}
-			if got.Player.Worlds[0].Name != "LanChelmsDeepNorth2" {
-				t.Fatalf("World name = %q", got.Player.Worlds[0].Name)
+			if got.Player.KnownWorlds[0].Name != "LanChelmsDeepNorth2" {
+				t.Fatalf("KnownWorld name = %q", got.Player.KnownWorlds[0].Name)
+			}
+			if len(got.Player.KnownWorldKeys) == 0 {
+				t.Fatal("KnownWorldKeys is empty")
 			}
 			if got.Player.GuardianPower.Name != "GP_Eikthyr" {
 				t.Fatalf("GuardianPower = %q", got.Player.GuardianPower.Name)
@@ -131,6 +134,9 @@ func TestDecodeSamples(t *testing.T) {
 			}
 			if got.Player.Inventory[0].Name == "" {
 				t.Fatal("first inventory item has empty name")
+			}
+			if got.Player.Inventory[0].WorldLevel != 0 {
+				t.Fatalf("first inventory item worldLevel = %d, want 0", got.Player.Inventory[0].WorldLevel)
 			}
 			if got.Player.SkillVersion != 2 {
 				t.Fatalf("SkillVersion = %d, want 2", got.Player.SkillVersion)
@@ -203,8 +209,8 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Trailer.Length != 64 || len(got.Trailer.Hash) != 64 {
 				t.Fatalf("bad trailer: length=%d hash=%d", got.Trailer.Length, len(got.Trailer.Hash))
 			}
-			if got.RemainingBytes > tt.remainingMax {
-				t.Fatalf("RemainingBytes = %d, expected at most %d after decoding player tail", got.RemainingBytes, tt.remainingMax)
+			if got.RemainingBytes != 0 {
+				t.Fatalf("RemainingBytes = %d, want 0", got.RemainingBytes)
 			}
 		})
 	}
