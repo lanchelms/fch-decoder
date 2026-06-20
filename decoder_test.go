@@ -199,6 +199,13 @@ func TestDecodeSamples(t *testing.T) {
 			if strings.Contains(string(inventoryJSON), "unknownTail") || strings.Contains(string(inventoryJSON), "unknownByte") {
 				t.Fatalf("inventory item JSON includes placeholder fields: %s", inventoryJSON)
 			}
+			characterJSON, err := json.Marshal(got)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(characterJSON), "knownCommands") || strings.Contains(string(characterJSON), "shownTutorials") || strings.Contains(string(characterJSON), "playerKnownTexts") {
+				t.Fatalf("character JSON includes skipped player fields: %s", characterJSON)
+			}
 			if len(got.Player.MaterialStats) != tt.materials {
 				t.Fatalf("MaterialStats = %d, want %d", len(got.Player.MaterialStats), tt.materials)
 			}

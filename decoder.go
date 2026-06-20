@@ -43,7 +43,7 @@ type PlayerData struct {
 	DateCreatedUnix  int64         `json:"dateCreatedUnix"`
 	KnownWorlds      []TimedEntry  `json:"knownWorlds,omitempty"`
 	KnownWorldKeys   []WorldKey    `json:"knownWorldKeys,omitempty"`
-	KnownCommands    []StatEntry   `json:"knownCommands,omitempty"`
+	KnownCommands    []StatEntry   `json:"-"`
 	EnemyStats       []StatEntry   `json:"enemyStats,omitempty"`
 	MaterialStats    []StatEntry   `json:"materialStats,omitempty"`
 	RecipeStats      []StatEntry   `json:"recipeStats,omitempty"`
@@ -63,11 +63,11 @@ type PlayerData struct {
 	KnownRecipes     []string      `json:"knownRecipes,omitempty"`
 	KnownStations    []Station     `json:"knownStations,omitempty"`
 	KnownMaterials   []string      `json:"knownMaterials,omitempty"`
-	ShownTutorials   []string      `json:"shownTutorials,omitempty"`
+	ShownTutorials   []string      `json:"-"`
 	Uniques          []string      `json:"uniques,omitempty"`
 	Trophies         []string      `json:"trophies,omitempty"`
 	KnownBiomes      []uint32      `json:"knownBiomes,omitempty"`
-	PlayerKnownTexts []TextEntry   `json:"playerKnownTexts,omitempty"`
+	PlayerKnownTexts []TextEntry   `json:"-"`
 	Beard            string        `json:"beard,omitempty"`
 	Hair             string        `json:"hair,omitempty"`
 	SkinColor        Vector3       `json:"skinColor"`
