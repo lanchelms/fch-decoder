@@ -108,8 +108,14 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Player.KnownWorlds[0].Name != "LanChelmsDeepNorth2" {
 				t.Fatalf("KnownWorld name = %q", got.Player.KnownWorlds[0].Name)
 			}
+			if got.Player.KnownWorlds[0].Seconds <= 0 {
+				t.Fatalf("KnownWorld seconds = %v, want positive", got.Player.KnownWorlds[0].Seconds)
+			}
 			if len(got.Player.KnownWorldKeys) == 0 {
 				t.Fatal("KnownWorldKeys is empty")
+			}
+			if got.Player.KnownWorldKeys[0].Raw == "" || got.Player.KnownWorldKeys[0].Seconds <= 0 {
+				t.Fatalf("bad first KnownWorldKey: %+v", got.Player.KnownWorldKeys[0])
 			}
 			if got.Player.GuardianPower.Name != "GP_Eikthyr" {
 				t.Fatalf("GuardianPower = %q", got.Player.GuardianPower.Name)

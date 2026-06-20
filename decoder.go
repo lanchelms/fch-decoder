@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 )
 
 const trailerSize = 72
@@ -40,8 +41,8 @@ type PlayerData struct {
 	StartSeed        string        `json:"startSeed"`
 	UsedCheats       bool          `json:"usedCheats"`
 	DateCreatedUnix  int64         `json:"dateCreatedUnix"`
-	KnownWorlds      []StatEntry   `json:"knownWorlds,omitempty"`
-	KnownWorldKeys   []StatEntry   `json:"knownWorldKeys,omitempty"`
+	KnownWorlds      []TimedEntry  `json:"knownWorlds,omitempty"`
+	KnownWorldKeys   []WorldKey    `json:"knownWorldKeys,omitempty"`
 	KnownCommands    []StatEntry   `json:"knownCommands,omitempty"`
 	EnemyStats       []StatEntry   `json:"enemyStats,omitempty"`
 	MaterialStats    []StatEntry   `json:"materialStats,omitempty"`
@@ -81,6 +82,18 @@ type PlayerData struct {
 type StatEntry struct {
 	Name  string  `json:"name"`
 	Value float32 `json:"value"`
+}
+
+type TimedEntry struct {
+	Name    string  `json:"name"`
+	Seconds float32 `json:"seconds"`
+}
+
+type WorldKey struct {
+	Raw     string  `json:"raw"`
+	Key     string  `json:"key,omitempty"`
+	Setting string  `json:"setting,omitempty"`
+	Seconds float32 `json:"seconds"`
 }
 
 type TextEntry struct {
@@ -224,8 +237,8 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.UsedCheats = r.bool()
 	p.DateCreatedUnix = int64(r.u64())
 
-	p.KnownWorlds = readStatEntries(r)
-	p.KnownWorldKeys = readStatEntries(r)
+	p.KnownWorlds = readTimedEntries(r)
+	p.KnownWorldKeys = readWorldKeys(r)
 	p.KnownCommands = readStatEntries(r)
 	p.EnemyStats = readStatEntries(r)
 	p.MaterialStats = readStatEntries(r)
@@ -246,6 +259,33 @@ func readStatEntries(r *reader) []StatEntry {
 		out = append(out, StatEntry{Name: r.str(), Value: r.f32()})
 	}
 	return out
+}
+
+func readTimedEntries(r *reader) []TimedEntry {
+	count := r.u32()
+	out := make([]TimedEntry, 0, count)
+	for range count {
+		out = append(out, TimedEntry{Name: r.str(), Seconds: r.f32()})
+	}
+	return out
+}
+
+func readWorldKeys(r *reader) []WorldKey {
+	count := r.u32()
+	out := make([]WorldKey, 0, count)
+	for range count {
+		raw := r.str()
+		out = append(out, parseWorldKey(raw, r.f32()))
+	}
+	return out
+}
+
+func parseWorldKey(raw string, seconds float32) WorldKey {
+	key, setting, ok := strings.Cut(raw, " ")
+	if !ok {
+		return WorldKey{Raw: raw, Seconds: seconds}
+	}
+	return WorldKey{Raw: raw, Key: key, Setting: setting, Seconds: seconds}
 }
 
 func readPlayerTail(r *reader, p *PlayerData) {

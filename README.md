@@ -8,7 +8,7 @@ The decoder currently reads:
 - leading player stat table with `PlayerStatType` names
 - the embedded gzip map block metadata
 - player name, player ID, cheat-use flag, and character creation timestamp
-- known world, known world key, known command, enemy, material, and recipe stat arrays
+- known world time, known world-key time history, known command, enemy, material, and recipe stat arrays
 - known material and recipe lists
 - known stations, shown tutorials, unique unlocks, trophies, known biomes, player known texts, hair/beard style, colors, and model index
 - player health/stamina/eitr state and equipped guardian power
@@ -23,6 +23,11 @@ stack-producing items suggests they should not be interpreted as lifetime item
 quantities either. For example, crafted arrows and food can have stat values far
 below the number of items produced because the game appears to count stat events
 rather than stack amounts.
+
+`knownWorlds` and `knownWorldKeys` are accumulated elapsed seconds. Valheim adds
+the seconds since the last save/load to the current world name and to each
+observed global-key state. They are history/telemetry entries, not current world
+settings.
 
 Current Valheim decompilation writes three player tail floats after player
 custom data: stamina, max eitr, and eitr. The bundled fixtures contain the first
