@@ -188,7 +188,7 @@ func decodePlayer(r *reader) (PlayerData, error) {
 
 	worldCount := r.u32()
 	p.Worlds = make([]WorldData, 0, worldCount)
-	for i := uint32(0); i < worldCount; i++ {
+	for range worldCount {
 		w := WorldData{Name: r.str(), Time: r.f32()}
 		w.Entries = readStatEntries(r)
 		p.Worlds = append(p.Worlds, w)
@@ -210,7 +210,7 @@ func decodePlayer(r *reader) (PlayerData, error) {
 func readStatEntries(r *reader) []StatEntry {
 	count := r.u32()
 	out := make([]StatEntry, 0, count)
-	for i := uint32(0); i < count; i++ {
+	for range count {
 		out = append(out, StatEntry{Name: r.str(), Value: r.f32()})
 	}
 	return out
@@ -219,7 +219,7 @@ func readStatEntries(r *reader) []StatEntry {
 func readPlayerTail(r *reader, p *PlayerData) {
 	p.KnownRecipes = r.stringList()
 	stationCount := r.u32()
-	for i := uint32(0); i < stationCount; i++ {
+	for range stationCount {
 		r.str()
 		r.u32()
 	}
@@ -229,25 +229,25 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	r.stringList() // trophies
 
 	biomeCount := r.u32()
-	for i := uint32(0); i < biomeCount; i++ {
+	for range biomeCount {
 		r.u32()
 	}
 
 	knownTextCount := r.u32()
-	for i := uint32(0); i < knownTextCount; i++ {
+	for range knownTextCount {
 		r.str()
 		r.str()
 	}
 
 	r.str() // beard
 	r.str() // hair
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		r.f32()
 	}
 	r.u32() // model index
 
 	foodCount := r.u32()
-	for i := uint32(0); i < foodCount; i++ {
+	for range foodCount {
 		r.str()
 		r.f32()
 	}
@@ -255,7 +255,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	p.SkillVersion = r.u32()
 	skillCount := r.u32()
 	p.Skills = make([]Skill, 0, skillCount)
-	for i := uint32(0); i < skillCount; i++ {
+	for range skillCount {
 		skillType := r.i32()
 		level := r.f32()
 		p.Skills = append(p.Skills, Skill{
@@ -268,7 +268,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	}
 
 	customDataCount := r.u32()
-	for i := uint32(0); i < customDataCount; i++ {
+	for range customDataCount {
 		r.str()
 		r.str()
 	}
@@ -325,7 +325,7 @@ func readPlayerState(r *reader, p *PlayerData) {
 func readInventory(r *reader) []Item {
 	count := r.u32()
 	out := make([]Item, 0, count)
-	for i := uint32(0); i < count; i++ {
+	for range count {
 		item := Item{
 			Name:        r.str(),
 			Stack:       r.i32(),

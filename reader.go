@@ -92,7 +92,7 @@ func (r *reader) str() string {
 func (r *reader) stringList() []string {
 	count := r.u32()
 	out := make([]string, 0, count)
-	for i := uint32(0); i < count; i++ {
+	for range count {
 		out = append(out, r.str())
 	}
 	return out
