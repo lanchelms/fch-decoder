@@ -197,8 +197,8 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Player.ModelIndex != tt.modelIndex {
 				t.Fatalf("ModelIndex = %d, want %d", got.Player.ModelIndex, tt.modelIndex)
 			}
-			if got.Map.UncompressedLength == 0 {
-				t.Fatal("map was not decompressed")
+			if got.Map.Offset == 0 || got.Map.CompressedLength == 0 || got.Map.StoredLength == 0 {
+				t.Fatalf("bad map metadata: offset=%d compressedLength=%d storedLength=%d", got.Map.Offset, got.Map.CompressedLength, got.Map.StoredLength)
 			}
 			if got.Trailer.Length != 64 || len(got.Trailer.Hash) != 64 {
 				t.Fatalf("bad trailer: length=%d hash=%d", got.Trailer.Length, len(got.Trailer.Hash))

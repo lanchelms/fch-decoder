@@ -2,7 +2,6 @@ package fch
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -23,10 +22,9 @@ type Character struct {
 }
 
 type MapSection struct {
-	Offset             int    `json:"offset"`
-	CompressedLength   uint32 `json:"compressedLength"`
-	StoredLength       uint32 `json:"storedLength"`
-	UncompressedLength int    `json:"uncompressedLength"`
+	Offset           int    `json:"offset"`
+	CompressedLength uint32 `json:"compressedLength"`
+	StoredLength     uint32 `json:"storedLength"`
 }
 
 type Trailer struct {
@@ -180,16 +178,10 @@ func readMapSection(data []byte, startOffset int) (MapSection, int, error) {
 		return MapSection{}, 0, fmt.Errorf("fch: invalid compressed map length %d at offset %d", compressedLen, gzipOffset)
 	}
 
-	uncompressed, err := gunzip(data[gzipOffset : gzipOffset+int(compressedLen)])
-	if err != nil {
-		return MapSection{}, 0, fmt.Errorf("fch: decompress map block: %w", err)
-	}
-
 	return MapSection{
-		Offset:             gzipOffset,
-		CompressedLength:   compressedLen,
-		StoredLength:       storedLen,
-		UncompressedLength: len(uncompressed),
+		Offset:           gzipOffset,
+		CompressedLength: compressedLen,
+		StoredLength:     storedLen,
 	}, gzipOffset + int(compressedLen), nil
 }
 
@@ -358,13 +350,4 @@ func readInventory(r *reader) []Item {
 		out = append(out, item)
 	}
 	return out
-}
-
-func gunzip(data []byte) ([]byte, error) {
-	zr, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer zr.Close()
-	return io.ReadAll(zr)
 }
