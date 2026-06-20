@@ -17,6 +17,7 @@ func TestDecodeSamples(t *testing.T) {
 		inventory    int
 		materials    int
 		recipes      int
+		worldID      uint64
 		playerLength uint32
 		remainingMax int
 	}{
@@ -27,6 +28,7 @@ func TestDecodeSamples(t *testing.T) {
 			inventory:    16,
 			materials:    108,
 			recipes:      35,
+			worldID:      455686963200,
 			playerLength: 7593,
 			remainingMax: 16,
 		},
@@ -37,6 +39,7 @@ func TestDecodeSamples(t *testing.T) {
 			inventory:    16,
 			materials:    141,
 			recipes:      54,
+			worldID:      455709081600,
 			playerLength: 10122,
 			remainingMax: 16,
 		},
@@ -68,6 +71,15 @@ func TestDecodeSamples(t *testing.T) {
 			}
 			if got.Player.PlayerID != tt.playerID {
 				t.Fatalf("PlayerID = %d, want %d", got.Player.PlayerID, tt.playerID)
+			}
+			if got.Player.StartSeed != "" {
+				t.Fatalf("StartSeed = %q, want empty", got.Player.StartSeed)
+			}
+			if got.Player.WorldID != tt.worldID {
+				t.Fatalf("WorldID = %d, want %d", got.Player.WorldID, tt.worldID)
+			}
+			if got.Player.UnknownFlag {
+				t.Fatal("UnknownFlag = true, want false")
 			}
 			if len(got.Player.Worlds) != 1 {
 				t.Fatalf("Worlds = %d, want 1", len(got.Player.Worlds))

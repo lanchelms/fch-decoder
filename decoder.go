@@ -39,9 +39,9 @@ type Trailer struct {
 type PlayerData struct {
 	Name             string        `json:"name"`
 	PlayerID         uint64        `json:"playerId"`
-	UnknownA         uint32        `json:"unknownA"`
-	UnknownB         uint32        `json:"unknownB"`
-	UnknownFlags     []bool        `json:"unknownFlags"`
+	StartSeed        string        `json:"startSeed"`
+	WorldID          uint64        `json:"worldId"`
+	UnknownFlag      bool          `json:"unknownFlag"`
 	Worlds           []WorldData   `json:"worlds"`
 	KnownTexts       []StatEntry   `json:"knownTexts,omitempty"`
 	EnemyStats       []StatEntry   `json:"enemyStats,omitempty"`
@@ -180,9 +180,9 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	var p PlayerData
 	p.Name = r.str()
 	p.PlayerID = r.u64()
-	p.UnknownA = r.u32()
-	p.UnknownB = r.u32()
-	p.UnknownFlags = []bool{r.bool(), r.bool()}
+	p.StartSeed = r.str()
+	p.WorldID = r.u64()
+	p.UnknownFlag = r.bool()
 
 	worldCount := r.u32()
 	p.Worlds = make([]WorldData, 0, worldCount)
