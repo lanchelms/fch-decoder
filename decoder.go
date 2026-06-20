@@ -320,22 +320,6 @@ func skillName(skillType int32) string {
 		return "Dodge"
 	case 110:
 		return "Ride"
-	case 781:
-		return "VL_Discipline"
-	case 791:
-		return "VL_Abjuration"
-	case 792:
-		return "VL_Alteration"
-	case 793:
-		return "VL_Conjuration"
-	case 794:
-		return "VL_Evocation"
-	case 795:
-		return "VL_Illusion"
-	case 999:
-		return "All"
-	case 2015031201:
-		return "PP_Alchemy"
 	default:
 		return ""
 	}
