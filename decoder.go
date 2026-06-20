@@ -135,31 +135,12 @@ func DecodeBytes(data []byte) (*Character, error) {
 		c.PlayerStatValues[i] = rd.f32()
 	}
 
-	gzipOffset := bytes.Index(data[rd.pos:], []byte{0x1f, 0x8b, 0x08})
-	if gzipOffset < 0 {
-		return nil, fmt.Errorf("fch: gzip map block not found")
-	}
-	gzipOffset += rd.pos
-	if gzipOffset < 12 {
-		return nil, fmt.Errorf("fch: gzip map block starts too early")
-	}
-	storedLen := binary.LittleEndian.Uint32(data[gzipOffset-12 : gzipOffset-8])
-	compressedLen := binary.LittleEndian.Uint32(data[gzipOffset-4 : gzipOffset])
-	if int(compressedLen) < 0 || gzipOffset+int(compressedLen) > len(data)-trailerSize {
-		return nil, fmt.Errorf("fch: invalid compressed map length %d at offset %d", compressedLen, gzipOffset)
-	}
-	uncompressed, err := gunzip(data[gzipOffset : gzipOffset+int(compressedLen)])
+	mapSection, playerOffset, err := readMapSection(data, rd.pos)
 	if err != nil {
-		return nil, fmt.Errorf("fch: decompress map block: %w", err)
+		return nil, err
 	}
-	c.Map = MapSection{
-		Offset:             gzipOffset,
-		CompressedLength:   compressedLen,
-		StoredLength:       storedLen,
-		UncompressedLength: len(uncompressed),
-	}
+	c.Map = mapSection
 
-	playerOffset := gzipOffset + int(compressedLen)
 	pr := newReader(data[playerOffset : len(data)-trailerSize])
 	player, err := decodePlayer(pr)
 	if err != nil {
@@ -181,6 +162,35 @@ func DecodeBytes(data []byte) (*Character, error) {
 		return nil, tr.err
 	}
 	return c, nil
+}
+
+func readMapSection(data []byte, startOffset int) (MapSection, int, error) {
+	gzipOffset := bytes.Index(data[startOffset:], []byte{0x1f, 0x8b, 0x08})
+	if gzipOffset < 0 {
+		return MapSection{}, 0, fmt.Errorf("fch: gzip map block not found")
+	}
+	gzipOffset += startOffset
+	if gzipOffset < 12 {
+		return MapSection{}, 0, fmt.Errorf("fch: gzip map block starts too early")
+	}
+
+	storedLen := binary.LittleEndian.Uint32(data[gzipOffset-12 : gzipOffset-8])
+	compressedLen := binary.LittleEndian.Uint32(data[gzipOffset-4 : gzipOffset])
+	if gzipOffset+int(compressedLen) > len(data)-trailerSize {
+		return MapSection{}, 0, fmt.Errorf("fch: invalid compressed map length %d at offset %d", compressedLen, gzipOffset)
+	}
+
+	uncompressed, err := gunzip(data[gzipOffset : gzipOffset+int(compressedLen)])
+	if err != nil {
+		return MapSection{}, 0, fmt.Errorf("fch: decompress map block: %w", err)
+	}
+
+	return MapSection{
+		Offset:             gzipOffset,
+		CompressedLength:   compressedLen,
+		StoredLength:       storedLen,
+		UncompressedLength: len(uncompressed),
+	}, gzipOffset + int(compressedLen), nil
 }
 
 func decodePlayer(r *reader) (PlayerData, error) {
