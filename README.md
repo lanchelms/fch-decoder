@@ -11,6 +11,7 @@ The decoder currently reads:
 - per-world key/value entries
 - known text, enemy, material, and recipe stat arrays
 - known material and recipe lists
+- unique unlocks, trophies, hair/beard style, and model index
 - player health/stamina state and equipped guardian power
 - inventory item records
 - player skill records

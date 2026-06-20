@@ -59,6 +59,11 @@ type PlayerData struct {
 	Inventory        []Item        `json:"inventory,omitempty"`
 	KnownRecipes     []string      `json:"knownRecipes,omitempty"`
 	KnownMaterials   []string      `json:"knownMaterials,omitempty"`
+	Uniques          []string      `json:"uniques,omitempty"`
+	Trophies         []string      `json:"trophies,omitempty"`
+	Beard            string        `json:"beard,omitempty"`
+	Hair             string        `json:"hair,omitempty"`
+	ModelIndex       uint32        `json:"modelIndex"`
 	SkillVersion     uint32        `json:"skillVersion,omitempty"`
 	Skills           []Skill       `json:"skills,omitempty"`
 }
@@ -225,8 +230,8 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	}
 	p.KnownMaterials = r.stringList()
 	r.stringList() // shown tutorials
-	r.stringList() // uniques
-	r.stringList() // trophies
+	p.Uniques = r.stringList()
+	p.Trophies = r.stringList()
 
 	biomeCount := r.u32()
 	for range biomeCount {
@@ -239,12 +244,12 @@ func readPlayerTail(r *reader, p *PlayerData) {
 		r.str()
 	}
 
-	r.str() // beard
-	r.str() // hair
+	p.Beard = r.str()
+	p.Hair = r.str()
 	for range 6 {
 		r.f32()
 	}
-	r.u32() // model index
+	p.ModelIndex = r.u32()
 
 	foodCount := r.u32()
 	for range foodCount {

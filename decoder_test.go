@@ -19,6 +19,11 @@ func TestDecodeSamples(t *testing.T) {
 		recipes        int
 		knownMaterials int
 		knownRecipes   int
+		uniques        int
+		trophies       int
+		beard          string
+		hair           string
+		modelIndex     uint32
 		worldID        uint64
 		playerLength   uint32
 		remainingMax   int
@@ -32,6 +37,11 @@ func TestDecodeSamples(t *testing.T) {
 			recipes:        35,
 			knownMaterials: 117,
 			knownRecipes:   189,
+			uniques:        4,
+			trophies:       10,
+			beard:          "Beard23",
+			hair:           "Hair33",
+			modelIndex:     0,
 			worldID:        455686963200,
 			playerLength:   7593,
 			remainingMax:   16,
@@ -45,6 +55,11 @@ func TestDecodeSamples(t *testing.T) {
 			recipes:        54,
 			knownMaterials: 143,
 			knownRecipes:   197,
+			uniques:        4,
+			trophies:       13,
+			beard:          "",
+			hair:           "Hair18",
+			modelIndex:     0,
 			worldID:        455709081600,
 			playerLength:   10122,
 			remainingMax:   16,
@@ -166,6 +181,21 @@ func TestDecodeSamples(t *testing.T) {
 			}
 			if len(got.Player.KnownRecipes) != tt.knownRecipes {
 				t.Fatalf("KnownRecipes = %d, want %d", len(got.Player.KnownRecipes), tt.knownRecipes)
+			}
+			if len(got.Player.Uniques) != tt.uniques {
+				t.Fatalf("Uniques = %d, want %d", len(got.Player.Uniques), tt.uniques)
+			}
+			if len(got.Player.Trophies) != tt.trophies {
+				t.Fatalf("Trophies = %d, want %d", len(got.Player.Trophies), tt.trophies)
+			}
+			if got.Player.Beard != tt.beard {
+				t.Fatalf("Beard = %q, want %q", got.Player.Beard, tt.beard)
+			}
+			if got.Player.Hair != tt.hair {
+				t.Fatalf("Hair = %q, want %q", got.Player.Hair, tt.hair)
+			}
+			if got.Player.ModelIndex != tt.modelIndex {
+				t.Fatalf("ModelIndex = %d, want %d", got.Player.ModelIndex, tt.modelIndex)
 			}
 			if got.Map.UncompressedLength == 0 {
 				t.Fatal("map was not decompressed")
