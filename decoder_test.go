@@ -167,3 +167,44 @@ func TestDecodeSamples(t *testing.T) {
 		})
 	}
 }
+
+func TestSkillName(t *testing.T) {
+	tests := map[int32]string{
+		0:   "None",
+		1:   "Swords",
+		2:   "Knives",
+		3:   "Clubs",
+		4:   "Polearms",
+		5:   "Spears",
+		6:   "Blocking",
+		7:   "Axes",
+		8:   "Bows",
+		9:   "ElementalMagic",
+		10:  "BloodMagic",
+		11:  "Unarmed",
+		12:  "Pickaxes",
+		13:  "WoodCutting",
+		14:  "Crossbows",
+		100: "Jump",
+		101: "Sneak",
+		102: "Run",
+		103: "Swim",
+		104: "Fishing",
+		105: "Cooking",
+		106: "Farming",
+		107: "Crafting",
+		108: "Dodge",
+		110: "Ride",
+		999: "All",
+	}
+
+	for skillType, want := range tests {
+		if got := skillName(skillType); got != want {
+			t.Fatalf("skillName(%d) = %q, want %q", skillType, got, want)
+		}
+	}
+
+	if got := skillName(109); got != "" {
+		t.Fatalf("skillName(109) = %q, want empty", got)
+	}
+}

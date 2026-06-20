@@ -272,57 +272,37 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	}
 }
 
+var skillNames = map[int32]string{
+	0:   "None",
+	1:   "Swords",
+	2:   "Knives",
+	3:   "Clubs",
+	4:   "Polearms",
+	5:   "Spears",
+	6:   "Blocking",
+	7:   "Axes",
+	8:   "Bows",
+	9:   "ElementalMagic",
+	10:  "BloodMagic",
+	11:  "Unarmed",
+	12:  "Pickaxes",
+	13:  "WoodCutting",
+	14:  "Crossbows",
+	100: "Jump",
+	101: "Sneak",
+	102: "Run",
+	103: "Swim",
+	104: "Fishing",
+	105: "Cooking",
+	106: "Farming",
+	107: "Crafting",
+	108: "Dodge",
+	110: "Ride",
+	999: "All",
+}
+
 func skillName(skillType int32) string {
-	switch skillType {
-	case 0:
-		return "None"
-	case 1:
-		return "Swords"
-	case 2:
-		return "Knives"
-	case 3:
-		return "Clubs"
-	case 4:
-		return "Polearms"
-	case 5:
-		return "Spears"
-	case 6:
-		return "Blocking"
-	case 7:
-		return "Axes"
-	case 8:
-		return "Bows"
-	case 9:
-		return "FireMagic"
-	case 10:
-		return "FrostMagic"
-	case 11:
-		return "Unarmed"
-	case 12:
-		return "Pickaxes"
-	case 13:
-		return "WoodCutting"
-	case 100:
-		return "Jump"
-	case 101:
-		return "Sneak"
-	case 102:
-		return "Run"
-	case 103:
-		return "Swim"
-	case 105:
-		return "Cooking"
-	case 106:
-		return "Farming"
-	case 107:
-		return "Crafting"
-	case 108:
-		return "Dodge"
-	case 110:
-		return "Ride"
-	default:
-		return ""
-	}
+	return skillNames[skillType]
 }
 
 func readPlayerState(r *reader, p *PlayerData) {
