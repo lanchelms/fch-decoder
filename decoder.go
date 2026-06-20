@@ -12,14 +12,14 @@ import (
 const trailerSize = 72
 
 type Character struct {
-	FileLength        uint32     `json:"fileLength"`
-	Version           uint32     `json:"version"`
-	PlayerDataVersion uint32     `json:"playerDataVersion"`
-	SkillValues       []float32  `json:"skillValues,omitempty"`
-	Map               MapSection `json:"map"`
-	Player            PlayerData `json:"player"`
-	Trailer           Trailer    `json:"trailer"`
-	RemainingBytes    int        `json:"remainingBytes"`
+	FileLength       uint32     `json:"fileLength"`
+	Version          uint32     `json:"version"`
+	PlayerStatCount  uint32     `json:"playerStatCount"`
+	PlayerStatValues []float32  `json:"playerStatValues,omitempty"`
+	Map              MapSection `json:"map"`
+	Player           PlayerData `json:"player"`
+	Trailer          Trailer    `json:"trailer"`
+	RemainingBytes   int        `json:"remainingBytes"`
 }
 
 type MapSection struct {
@@ -49,6 +49,8 @@ type PlayerData struct {
 	RecipeStats   []StatEntry   `json:"recipeStats,omitempty"`
 	GuardianPower GuardianPower `json:"guardianPower"`
 	Inventory     []Item        `json:"inventory,omitempty"`
+	SkillVersion  uint32        `json:"skillVersion,omitempty"`
+	Skills        []Skill       `json:"skills,omitempty"`
 }
 
 type WorldData struct {
@@ -70,6 +72,14 @@ type GuardianPower struct {
 	Name          string    `json:"name"`
 	Cooldown      float32   `json:"cooldown"`
 	UnknownIntC   uint32    `json:"unknownIntC"`
+}
+
+type Skill struct {
+	Type         int32   `json:"type"`
+	Name         string  `json:"name,omitempty"`
+	Level        float32 `json:"level"`
+	DisplayLevel int32   `json:"displayLevel"`
+	Accumulator  float32 `json:"accumulator"`
 }
 
 type Item struct {
@@ -102,7 +112,7 @@ func DecodeBytes(data []byte) (*Character, error) {
 	c := &Character{}
 	c.FileLength = rd.u32()
 	c.Version = rd.u32()
-	c.PlayerDataVersion = rd.u32()
+	c.PlayerStatCount = rd.u32()
 	if rd.err != nil {
 		return nil, rd.err
 	}
@@ -110,10 +120,9 @@ func DecodeBytes(data []byte) (*Character, error) {
 		return nil, fmt.Errorf("fch: length header %d does not match file size %d", c.FileLength, len(data))
 	}
 
-	// Current samples store PlayerDataVersion float values before the map block.
-	c.SkillValues = make([]float32, int(c.PlayerDataVersion))
-	for i := range c.SkillValues {
-		c.SkillValues[i] = rd.f32()
+	c.PlayerStatValues = make([]float32, int(c.PlayerStatCount))
+	for i := range c.PlayerStatValues {
+		c.PlayerStatValues[i] = rd.f32()
 	}
 
 	gzipOffset := bytes.Index(data[rd.pos:], []byte{0x1f, 0x8b, 0x08})
@@ -186,6 +195,7 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.RecipeStats = readStatEntries(r)
 	p.GuardianPower = readGuardianPower(r)
 	p.Inventory = readInventory(r)
+	readPlayerTail(r, &p)
 	if r.err != nil {
 		return p, r.err
 	}
@@ -199,6 +209,142 @@ func readStatEntries(r *reader) []StatEntry {
 		out = append(out, StatEntry{Name: r.str(), Value: r.f32()})
 	}
 	return out
+}
+
+func readPlayerTail(r *reader, p *PlayerData) {
+	readStringList(r) // known recipes
+	stationCount := r.u32()
+	for i := uint32(0); i < stationCount; i++ {
+		r.str()
+		r.u32()
+	}
+	readStringList(r) // known materials
+	readStringList(r) // shown tutorials
+	readStringList(r) // uniques
+	readStringList(r) // trophies
+
+	biomeCount := r.u32()
+	for i := uint32(0); i < biomeCount; i++ {
+		r.u32()
+	}
+
+	knownTextCount := r.u32()
+	for i := uint32(0); i < knownTextCount; i++ {
+		r.str()
+		r.str()
+	}
+
+	r.str() // beard
+	r.str() // hair
+	for i := 0; i < 6; i++ {
+		r.f32()
+	}
+	r.u32() // model index
+
+	foodCount := r.u32()
+	for i := uint32(0); i < foodCount; i++ {
+		r.str()
+		r.f32()
+	}
+
+	p.SkillVersion = r.u32()
+	skillCount := r.u32()
+	p.Skills = make([]Skill, 0, skillCount)
+	for i := uint32(0); i < skillCount; i++ {
+		skillType := r.i32()
+		level := r.f32()
+		p.Skills = append(p.Skills, Skill{
+			Type:         skillType,
+			Name:         skillName(skillType),
+			Level:        level,
+			DisplayLevel: int32(math.Floor(float64(level))),
+			Accumulator:  r.f32(),
+		})
+	}
+
+	customDataCount := r.u32()
+	for i := uint32(0); i < customDataCount; i++ {
+		r.str()
+		r.str()
+	}
+}
+
+func readStringList(r *reader) []string {
+	count := r.u32()
+	out := make([]string, 0, count)
+	for i := uint32(0); i < count; i++ {
+		out = append(out, r.str())
+	}
+	return out
+}
+
+func skillName(skillType int32) string {
+	switch skillType {
+	case 0:
+		return "None"
+	case 1:
+		return "Swords"
+	case 2:
+		return "Knives"
+	case 3:
+		return "Clubs"
+	case 4:
+		return "Polearms"
+	case 5:
+		return "Spears"
+	case 6:
+		return "Blocking"
+	case 7:
+		return "Axes"
+	case 8:
+		return "Bows"
+	case 9:
+		return "FireMagic"
+	case 10:
+		return "FrostMagic"
+	case 11:
+		return "Unarmed"
+	case 12:
+		return "Pickaxes"
+	case 13:
+		return "WoodCutting"
+	case 100:
+		return "Jump"
+	case 101:
+		return "Sneak"
+	case 102:
+		return "Run"
+	case 103:
+		return "Swim"
+	case 105:
+		return "Cooking"
+	case 106:
+		return "Farming"
+	case 107:
+		return "Crafting"
+	case 108:
+		return "Dodge"
+	case 110:
+		return "Ride"
+	case 781:
+		return "VL_Discipline"
+	case 791:
+		return "VL_Abjuration"
+	case 792:
+		return "VL_Alteration"
+	case 793:
+		return "VL_Conjuration"
+	case 794:
+		return "VL_Evocation"
+	case 795:
+		return "VL_Illusion"
+	case 999:
+		return "All"
+	case 2015031201:
+		return "PP_Alchemy"
+	default:
+		return ""
+	}
 }
 
 func readGuardianPower(r *reader) GuardianPower {

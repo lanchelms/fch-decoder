@@ -2,6 +2,7 @@ package fch
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +17,7 @@ func TestDecodeSamples(t *testing.T) {
 		inventory    int
 		materials    int
 		recipes      int
-		remainingMin int
+		remainingMax int
 	}{
 		{
 			file:         "Steam_76561197968487130_fenris bueller.fch",
@@ -25,7 +26,7 @@ func TestDecodeSamples(t *testing.T) {
 			inventory:    16,
 			materials:    108,
 			recipes:      35,
-			remainingMin: 1000,
+			remainingMax: 16,
 		},
 		{
 			file:         "Steam_76561198018104185_bortson.fch",
@@ -34,7 +35,7 @@ func TestDecodeSamples(t *testing.T) {
 			inventory:    16,
 			materials:    141,
 			recipes:      54,
-			remainingMin: 1000,
+			remainingMax: 16,
 		},
 	}
 
@@ -53,8 +54,11 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Version != 43 {
 				t.Fatalf("Version = %d, want 43", got.Version)
 			}
-			if got.PlayerDataVersion != 105 {
-				t.Fatalf("PlayerDataVersion = %d, want 105", got.PlayerDataVersion)
+			if got.PlayerStatCount != 105 {
+				t.Fatalf("PlayerStatCount = %d, want 105", got.PlayerStatCount)
+			}
+			if len(got.PlayerStatValues) != int(got.PlayerStatCount) {
+				t.Fatalf("PlayerStatValues = %d, want %d", len(got.PlayerStatValues), got.PlayerStatCount)
 			}
 			if got.Player.Name != tt.name {
 				t.Fatalf("Name = %q, want %q", got.Player.Name, tt.name)
@@ -77,6 +81,37 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Player.Inventory[0].Name == "" {
 				t.Fatal("first inventory item has empty name")
 			}
+			if got.Player.SkillVersion != 2 {
+				t.Fatalf("SkillVersion = %d, want 2", got.Player.SkillVersion)
+			}
+			if len(got.Player.Skills) != 24 {
+				t.Fatalf("Skills = %d, want 24", len(got.Player.Skills))
+			}
+			if got.Player.Skills[0].Name == "" {
+				t.Fatalf("first skill has no mapped name: type=%d", got.Player.Skills[0].Type)
+			}
+			wantDisplayLevel := int32(math.Floor(float64(got.Player.Skills[0].Level)))
+			if got.Player.Skills[0].DisplayLevel != wantDisplayLevel {
+				t.Fatalf("first skill display level = %d, want %d", got.Player.Skills[0].DisplayLevel, wantDisplayLevel)
+			}
+			wantSkillNames := map[int32]string{
+				105: "Cooking",
+				106: "Farming",
+				107: "Crafting",
+				108: "Dodge",
+			}
+			for skillType, wantName := range wantSkillNames {
+				gotName := ""
+				for _, skill := range got.Player.Skills {
+					if skill.Type == skillType {
+						gotName = skill.Name
+						break
+					}
+				}
+				if gotName != wantName {
+					t.Fatalf("skill %d name = %q, want %q", skillType, gotName, wantName)
+				}
+			}
 			inventoryJSON, err := json.Marshal(got.Player.Inventory[0])
 			if err != nil {
 				t.Fatal(err)
@@ -96,8 +131,8 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Trailer.Length != 64 || len(got.Trailer.Hash) != 64 {
 				t.Fatalf("bad trailer: length=%d hash=%d", got.Trailer.Length, len(got.Trailer.Hash))
 			}
-			if got.RemainingBytes < tt.remainingMin {
-				t.Fatalf("RemainingBytes = %d, expected at least %d while tail sections are not decoded", got.RemainingBytes, tt.remainingMin)
+			if got.RemainingBytes > tt.remainingMax {
+				t.Fatalf("RemainingBytes = %d, expected at most %d after decoding player tail", got.RemainingBytes, tt.remainingMax)
 			}
 		})
 	}

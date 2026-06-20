@@ -5,14 +5,18 @@ Go decoder for current Valheim `.fch` character files.
 The decoder currently reads:
 
 - file/version header and the 72-byte footer/hash block
+- leading player stat float table
 - the embedded gzip map block metadata
 - player name and player ID
 - per-world key/value entries
 - known text, enemy, material, and recipe stat arrays
 - equipped guardian power block
 - inventory item records
+- player skill records
 
-Tail sections after inventory are kept as `RemainingBytes` for now. In the sample files those bytes contain additional string-list sections such as known recipes/build pieces, tutorials, appearance, food, pins, and plugin custom data.
+Most tail sections after inventory are consumed to reach the skill records. A small end-of-player fragment is still kept as `RemainingBytes` until those bytes are identified.
+
+Skill records include the saved float `level`, a floored `displayLevel` matching the in-game level number, and `accumulator`, which appears to drive progress toward the next displayed level. The accumulator is raw progress input, not a normalized percentage.
 
 ## CLI
 
