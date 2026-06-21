@@ -47,6 +47,12 @@ var (
 		[]string{"player", "stat"},
 		nil,
 	)
+	distanceDesc = prometheus.NewDesc(
+		"valheim_character_distance",
+		"Valheim character distance traveled in world units. Sail is inferred because Valheim's raw DistanceSail stat is a sample counter.",
+		[]string{"player", "mode"},
+		nil,
+	)
 	scrapeErrorsDesc = prometheus.NewDesc(
 		"valheim_character_scrape_errors",
 		"Number of Valheim character files or directories that could not be scraped.",
@@ -58,6 +64,7 @@ var (
 		craftingDesc,
 		enemiesDesc,
 		statsDesc,
+		distanceDesc,
 		scrapeErrorsDesc,
 	}
 )
@@ -74,11 +81,6 @@ var allowedPlayerStats = map[string]bool{
 	"ItemsPickedUp":         true,
 	"Crafts":                true,
 	"Upgrades":              true,
-	"DistanceTraveled":      true,
-	"DistanceWalk":          true,
-	"DistanceRun":           true,
-	"DistanceSail":          true,
-	"DistanceAir":           true,
 	"TimeInBase":            true,
 	"TimeOutOfBase":         true,
 	"Sleep":                 true,
@@ -291,7 +293,33 @@ func newMetrics(character *fch.Character) metrics {
 		}
 		out.add(statsDesc, float64(stat.Value), stat.Name)
 	}
+	out.addDistanceStats(character.PlayerStats)
 	return out
+}
+
+func (m *metrics) addDistanceStats(entries []fch.StatEntry) {
+	stats := map[string]float64{}
+	for _, entry := range entries {
+		stats[entry.Name] = float64(entry.Value)
+	}
+
+	total, ok := stats["DistanceTraveled"]
+	if !ok {
+		return
+	}
+	walk := stats["DistanceWalk"]
+	run := stats["DistanceRun"]
+	air := stats["DistanceAir"]
+	sail := total - walk - run - air
+	if sail < 0 && sail > -0.001 {
+		sail = 0
+	}
+
+	m.add(distanceDesc, total, "Total")
+	m.add(distanceDesc, walk, "Walk")
+	m.add(distanceDesc, run, "Run")
+	m.add(distanceDesc, sail, "Sail")
+	m.add(distanceDesc, air, "Air")
 }
 
 func characterFiles(dir string) ([]string, error) {

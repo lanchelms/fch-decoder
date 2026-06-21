@@ -53,6 +53,13 @@ The exporter serves `/metrics` and emits:
 - `valheim_character_crafting{player,recipe}`
 - `valheim_character_enemies{player,enemy}`
 - `valheim_character_stats{player,stat}`
+- `valheim_character_distance{player,mode}`
+
+`valheim_character_stats` reports selected raw counters saved by Valheim,
+excluding movement distance stats. Use `valheim_character_distance` for walk,
+run, air, total, and inferred sail distances in consistent world units. The
+raw `DistanceSail` counter is intentionally not exported because Valheim saves
+it as a sailing sample count, not a distance.
 
 Only current `.fch` files are loaded; `.fch.old` and `backup_auto-*.fch` files
 are ignored. Each scrape rediscovers the directory and decodes files through a
