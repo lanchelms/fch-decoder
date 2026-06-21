@@ -41,6 +41,28 @@ Skill records include the saved float `level`, a floored `displayLevel` matching
 go run ./cmd/fchdump 'testdata/Steam_76561198018104185_bortson.fch'
 ```
 
+## Prometheus exporter
+
+```sh
+go run ./cmd/fchprom -dir "$HOME/.config/unity3d/IronGate/Valheim/characters_local" -addr :9108
+```
+
+The exporter serves `/metrics` and emits:
+
+- `valheim_character_skills{player,skill}`
+- `valheim_character_crafting{player,recipe}`
+- `valheim_character_enemies{player,enemy}`
+- `valheim_character_stats{player,stat}`
+
+Only current `.fch` files are loaded; `.fch.old` and `backup_auto-*.fch` files
+are ignored. Each scrape rediscovers the directory and decodes files through a
+bounded worker pool. Decoded metrics are cached briefly by default so close
+scrapes do not repeatedly parse the same files:
+
+```sh
+go run ./cmd/fchprom -dir testdata -addr :9108 -workers 4 -cache-ttl 5s
+```
+
 ## Library
 
 ```go
