@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	fch "github.com/brian/fch-decoder"
+	fch "github.com/lanchelms/fch-decoder"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/text/cases"

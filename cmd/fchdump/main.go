@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	fch "github.com/brian/fch-decoder"
+	fch "github.com/lanchelms/fch-decoder"
 )
 
 func main() {

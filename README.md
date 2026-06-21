@@ -1,114 +1,99 @@
+![fch-decoder](images/fch-decoder-header.png)
+
 # fch-decoder
 
-Go decoder for current Valheim `.fch` character files.
+Decode current Valheim `.fch` character files from Go, the command line, or a Prometheus scrape target. It reads player identity, stats, inventory, foods, skills, unlocks, known lists, and other saved character data.
 
-The decoder currently reads:
+## How To Install
 
-- file/version header and the 72-byte footer/hash block
-- leading player stat table with `PlayerStatType` names
-- the embedded gzip map block metadata
-- player name, player ID, cheat-use flag, and character creation timestamp
-- known world time, known world-key time history, known command, enemy, material, and recipe stat arrays
-- known material and recipe lists
-- known stations, shown tutorials, unique unlocks, trophies, known biomes, player known texts, hair/beard style, colors, and model index
-- player health/stamina/eitr state and equipped guardian power
-- inventory item records, including item custom data, world level, and picked-up flag
-- active food records
-- player skill records
-- player custom data
-
-`materialStats` and `recipeStats` are the raw per-item stat counters saved in
-the character file. They are not current inventory contents, and evidence from
-stack-producing items suggests they should not be interpreted as lifetime item
-quantities either. For example, crafted arrows and food can have stat values far
-below the number of items produced because the game appears to count stat events
-rather than stack amounts.
-
-`knownWorlds` and `knownWorldKeys` are accumulated elapsed seconds. Valheim adds
-the seconds since the last save/load to the current world name and to each
-observed global-key state. They are history/telemetry entries, not current world
-settings.
-
-Current Valheim decompilation writes three player tail floats after player
-custom data: stamina, max eitr, and eitr. The bundled fixtures contain the first
-two tail floats, so `eitr` remains zero for those files.
-
-Skill records include the saved float `level`, a floored `displayLevel` matching the in-game level number, and `accumulator`, which appears to drive progress toward the next displayed level. The accumulator is raw progress input, not a normalized percentage.
-
-## CLI
+### Library
 
 ```sh
-go run ./cmd/fchdump 'testdata/Steam_76561198018104185_bortson.fch'
+go get github.com/lanchelms/fch-decoder
 ```
 
-## Prometheus exporter
+### CLI
 
 ```sh
-go run ./cmd/fchprom -dir "$HOME/.config/unity3d/IronGate/Valheim/characters_local" -addr :9108
+go install github.com/lanchelms/fch-decoder/cmd/fchdump@latest
 ```
 
-The exporter serves `/metrics` and emits:
-
-- `valheim_character_skills{player,skill}`
-- `valheim_character_crafting{player,recipe}`
-- `valheim_character_enemies{player,enemy}`
-- `valheim_character_stats{player,stat}`
-- `valheim_character_distance{player,mode}`
-
-`valheim_character_stats` reports selected raw counters saved by Valheim,
-excluding movement distance stats. Use `valheim_character_distance` for walk,
-run, air, total, and inferred sail distances in consistent world units. The
-raw `DistanceSail` counter is intentionally not exported because Valheim saves
-it as a sailing sample count, not a distance.
-
-Only current `.fch` files are loaded; `.fch.old` and `backup_auto-*.fch` files
-are ignored. Each scrape rediscovers the directory and decodes files through a
-bounded worker pool. Decoded metrics are cached briefly by default so close
-scrapes do not repeatedly parse the same files:
-
-```sh
-go run ./cmd/fchprom -dir testdata -addr :9108 -workers 4 -cache-ttl 5s
-```
-
-## Docker
-
-Build each command image from the repository root:
+Or build the container image from the repository root:
 
 ```sh
 docker build -f cmd/fchdump/Dockerfile -t fchdump .
+```
+
+### Prometheus Exporter
+
+```sh
+go install github.com/lanchelms/fch-decoder/cmd/fchprom@latest
+```
+
+Or build the container image from the repository root:
+
+```sh
 docker build -f cmd/fchprom/Dockerfile -t fchprom .
 ```
 
-Run the decoder with a mounted character file:
+## Library
+
+Use the Go package when you want structured character data inside your own application.
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+
+	fch "github.com/lanchelms/fch-decoder"
+)
+
+func main() {
+	file, err := os.Open("character.fch")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	character, err := fch.Decode(file)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(character.Player.Name)
+}
+```
+
+## CLI
+
+`fchdump` decodes one character file and writes formatted JSON to stdout.
+
+```sh
+fchdump 'testdata/Steam_76561198018104185_bortson.fch'
+```
+
+Container example:
 
 ```sh
 docker run --rm -v "$PWD/testdata:/data:ro" fchdump /data/Steam_76561198018104185_bortson.fch
 ```
 
-Run the Prometheus exporter with a mounted character directory:
+## Prometheus Exporter
+
+`fchprom` scans a Valheim `characters_local` directory and serves character metrics at `/metrics`.
 
 ```sh
-docker run --rm -p 9108:9108 -v "$HOME/.config/unity3d/IronGate/Valheim/characters_local:/characters:ro" fchprom -dir /characters -addr :9108
+fchprom -dir "$HOME/.config/unity3d/IronGate/Valheim/characters_local" -addr :9108
 ```
 
-## Library
-
-```go
-f, err := os.Open("character.fch")
-if err != nil {
-	panic(err)
-}
-defer f.Close()
-
-character, err := fch.Decode(f)
-if err != nil {
-	panic(err)
-}
-fmt.Println(character.Player.Name)
-```
-
-## Tests
+Container example:
 
 ```sh
-go test ./...
+docker run --rm -p 9108:9108 \
+  -v "$HOME/.config/unity3d/IronGate/Valheim/characters_local:/characters:ro" \
+  fchprom -dir /characters -addr :9108
 ```
+
+The exporter reports skills, recipe counters, enemy counters, selected player stats, inferred distance metrics, and scrape errors. It ignores `.fch.old` and `backup_auto-*.fch` files.
