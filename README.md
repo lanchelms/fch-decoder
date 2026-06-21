@@ -70,6 +70,27 @@ scrapes do not repeatedly parse the same files:
 go run ./cmd/fchprom -dir testdata -addr :9108 -workers 4 -cache-ttl 5s
 ```
 
+## Docker
+
+Build each command image from the repository root:
+
+```sh
+docker build -f cmd/fchdump/Dockerfile -t fchdump .
+docker build -f cmd/fchprom/Dockerfile -t fchprom .
+```
+
+Run the decoder with a mounted character file:
+
+```sh
+docker run --rm -v "$PWD/testdata:/data:ro" fchdump /data/Steam_76561198018104185_bortson.fch
+```
+
+Run the Prometheus exporter with a mounted character directory:
+
+```sh
+docker run --rm -p 9108:9108 -v "$HOME/.config/unity3d/IronGate/Valheim/characters_local:/characters:ro" fchprom -dir /characters -addr :9108
+```
+
 ## Library
 
 ```go

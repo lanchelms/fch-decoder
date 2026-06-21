@@ -1,0 +1,12 @@
+*
+
+!go.mod
+!go.sum
+!*.go
+!cmd/
+!cmd/fchdump/
+!cmd/fchdump/Dockerfile
+!cmd/fchdump/main.go
+!cmd/fchprom/
+!cmd/fchprom/Dockerfile
+!cmd/fchprom/main.go

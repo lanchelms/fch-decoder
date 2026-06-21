@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.cmd }} ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cmd: fchdump
+            goos: linux
+            goarch: amd64
+          - cmd: fchdump
+            goos: linux
+            goarch: arm64
+          - cmd: fchdump
+            goos: windows
+            goarch: amd64
+          - cmd: fchprom
+            goos: linux
+            goarch: amd64
+          - cmd: fchprom
+            goos: linux
+            goarch: arm64
+          - cmd: fchprom
+            goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build and package
+        env:
+          CMD: ${{ matrix.cmd }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          base="${CMD}-${tag}-${GOOS}-${GOARCH}"
+          stage="dist/${base}"
+          mkdir -p "${stage}"
+          if [ "${GOOS}" = "windows" ]; then
+            bin="${stage}/${CMD}.exe"
+          else
+            bin="${stage}/${CMD}"
+          fi
+          go build -trimpath -ldflags="-s -w" -o "${bin}" "./cmd/${CMD}"
+          cp README.md "${stage}/"
+          cd dist
+          if [ "${GOOS}" = "windows" ]; then
+            zip -qr "${base}.zip" "${base}"
+          else
+            tar -czf "${base}.tar.gz" "${base}"
+          fi
+          rm -rf "${base}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: archive-${{ matrix.cmd }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          retention-days: 7
+
+  docker:
+    name: Build and push ${{ matrix.cmd }} Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cmd: fchdump
+          - cmd: fchprom
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-${{ matrix.cmd }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: cmd/${{ matrix.cmd }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.cmd }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cmd }}
+
+  release:
+    name: Publish release
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: archive-*
+          merge-multiple: true
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          prerelease=""
+          case "${tag}" in
+            *-*) prerelease="--prerelease" ;;
+          esac
+          gh release create "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${tag}" \
+            --generate-notes \
+            ${prerelease} \
+            dist/*
