@@ -353,10 +353,6 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	}
 }
 
-func skillName(skillType int32) string {
-	return skillNames[skillType]
-}
-
 func readPlayerState(r *reader, p *PlayerData) {
 	p.HasPlayerData = r.bool()
 	p.PlayerDataLength = r.u32()
@@ -398,11 +394,4 @@ func readInventory(r *reader) []Item {
 		out = append(out, item)
 	}
 	return out
-}
-
-func playerStatName(index int) string {
-	if index < 0 || index >= len(playerStatNames) {
-		return ""
-	}
-	return playerStatNames[index]
 }

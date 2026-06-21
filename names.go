@@ -29,6 +29,10 @@ var skillNames = map[int32]string{
 	999: "All",
 }
 
+func skillName(skillType int32) string {
+	return skillNames[skillType]
+}
+
 var playerStatNames = []string{
 	"Deaths",
 	"CraftsOrUpgrades",
@@ -135,4 +139,11 @@ var playerStatNames = []string{
 	"UsePowerQueen",
 	"UsePowerAshlands",
 	"UsePowerDeepNorth",
+}
+
+func playerStatName(index int) string {
+	if index < 0 || index >= len(playerStatNames) {
+		return ""
+	}
+	return playerStatNames[index]
 }
