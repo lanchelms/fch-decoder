@@ -1,3 +1,5 @@
 /fchdump
 cmd/fchdump/fchdump
 AGENTS.md
+.env
+.env.local

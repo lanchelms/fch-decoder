@@ -1,0 +1,13 @@
+services:
+  fchprom:
+    image: ghcr.io/lanchelms/fch-decoder-fchprom:latest
+    command:
+      - -dir
+      - /characters
+      - -addr
+      - :9108
+    ports:
+      - "${FCHPROM_PORT:-9108}:9108"
+    volumes:
+      - "${FCHPROM_CHARACTERS_DIR:-${HOME}/.config/unity3d/IronGate/Valheim/characters_local}:/characters:ro"
+    restart: unless-stopped
