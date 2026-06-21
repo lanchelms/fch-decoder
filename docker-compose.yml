@@ -1,5 +1,6 @@
 services:
   fchprom:
+    container_name: fchprom
     image: ghcr.io/lanchelms/fch-decoder-fchprom:latest
     command:
       - -dir
@@ -11,3 +12,7 @@ services:
     volumes:
       - "${FCHPROM_CHARACTERS_DIR:-${HOME}/.config/unity3d/IronGate/Valheim/characters_local}:/characters:ro"
     restart: unless-stopped
+
+networks:
+  default:
+    name: fchprom
