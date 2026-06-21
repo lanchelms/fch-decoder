@@ -237,12 +237,12 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.UsedCheats = r.bool()
 	p.DateCreatedUnix = int64(r.u64())
 
-	p.KnownWorlds = readTimedEntries(r)
-	p.KnownWorldKeys = readWorldKeys(r)
-	p.KnownCommands = readStatEntries(r)
-	p.EnemyStats = readStatEntries(r)
-	p.MaterialStats = readStatEntries(r)
-	p.RecipeStats = readStatEntries(r)
+	p.KnownWorlds = readKeyedFloats(r, timedEntry)
+	p.KnownWorldKeys = readKeyedFloats(r, worldKey)
+	p.KnownCommands = readKeyedFloats(r, statEntry)
+	p.EnemyStats = readKeyedFloats(r, statEntry)
+	p.MaterialStats = readKeyedFloats(r, statEntry)
+	p.RecipeStats = readKeyedFloats(r, statEntry)
 	readPlayerState(r, &p)
 	p.Inventory = readInventory(r)
 	readPlayerTail(r, &p)
@@ -252,35 +252,24 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	return p, nil
 }
 
-func readStatEntries(r *reader) []StatEntry {
+func readKeyedFloats[T any](r *reader, convert func(string, float32) T) []T {
 	count := r.u32()
-	out := make([]StatEntry, 0, count)
+	out := make([]T, 0, count)
 	for range count {
-		out = append(out, StatEntry{Name: r.str(), Value: r.f32()})
+		out = append(out, convert(r.str(), r.f32()))
 	}
 	return out
 }
 
-func readTimedEntries(r *reader) []TimedEntry {
-	count := r.u32()
-	out := make([]TimedEntry, 0, count)
-	for range count {
-		out = append(out, TimedEntry{Name: r.str(), Seconds: r.f32()})
-	}
-	return out
+func statEntry(name string, value float32) StatEntry {
+	return StatEntry{Name: name, Value: value}
 }
 
-func readWorldKeys(r *reader) []WorldKey {
-	count := r.u32()
-	out := make([]WorldKey, 0, count)
-	for range count {
-		raw := r.str()
-		out = append(out, parseWorldKey(raw, r.f32()))
-	}
-	return out
+func timedEntry(name string, seconds float32) TimedEntry {
+	return TimedEntry{Name: name, Seconds: seconds}
 }
 
-func parseWorldKey(raw string, seconds float32) WorldKey {
+func worldKey(raw string, seconds float32) WorldKey {
 	key, setting, ok := strings.Cut(raw, " ")
 	if !ok {
 		return WorldKey{Raw: raw, Seconds: seconds}
