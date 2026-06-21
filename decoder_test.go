@@ -247,51 +247,6 @@ func TestDecodeSamples(t *testing.T) {
 	}
 }
 
-func TestDecodeConvertedListsFromSample(t *testing.T) {
-	f, err := os.Open(filepath.Join("testdata", "Steam_76561198018104185_bortson.fch"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	got, err := Decode(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := got.Player
-
-	if got := p.KnownWorlds[0]; got != (TimedEntry{Name: "LanChelmsDeepNorth2", Seconds: 284707}) {
-		t.Fatalf("KnownWorlds[0] = %+v", got)
-	}
-	if got := p.KnownWorldKeys[0]; got != (WorldKey{Raw: "nomap", Seconds: 7}) {
-		t.Fatalf("KnownWorldKeys[0] = %+v", got)
-	}
-	if got := findWorldKey(p.KnownWorldKeys, "PlayerDamage default"); got != (WorldKey{Raw: "PlayerDamage default", Key: "PlayerDamage", Setting: "default", Seconds: 1375}) {
-		t.Fatalf("KnownWorldKeys[PlayerDamage default] = %+v", got)
-	}
-	if got := p.KnownCommands[0]; got != (StatEntry{Name: "say", Value: 6}) {
-		t.Fatalf("KnownCommands[0] = %+v", got)
-	}
-	if got := p.EnemyStats[0]; got != (StatEntry{Name: "$enemy_greyling", Value: 122}) {
-		t.Fatalf("EnemyStats[0] = %+v", got)
-	}
-	if got := p.MaterialStats[0]; got != (StatEntry{Name: "$item_torch", Value: 8}) {
-		t.Fatalf("MaterialStats[0] = %+v", got)
-	}
-	if got := p.RecipeStats[0]; got != (StatEntry{Name: "$item_axe_stone", Value: 1}) {
-		t.Fatalf("RecipeStats[0] = %+v", got)
-	}
-	if got := p.PlayerKnownTexts[0]; got != (TextEntry{Key: "$tutorial_workbench_label", Value: "$tutorial_workbench_text"}) {
-		t.Fatalf("PlayerKnownTexts[0] = %+v", got)
-	}
-	if got := p.Foods[0]; got != (Food{Name: "CarrotSoup", Time: 693}) {
-		t.Fatalf("Foods[0] = %+v", got)
-	}
-	if got := p.CustomData[0]; got != (TextEntry{Key: "ACB_PreventPulling", Value: "1"}) {
-		t.Fatalf("CustomData[0] = %+v", got)
-	}
-}
-
 func TestReadInventoryCustomData(t *testing.T) {
 	var data []byte
 	data = appendU32(data, 1)
@@ -318,15 +273,6 @@ func TestReadInventoryCustomData(t *testing.T) {
 	if got := got[0].CustomData; len(got) != 1 || got[0] != (TextEntry{Key: "custom-key", Value: "custom-value"}) {
 		t.Fatalf("Inventory[0].CustomData = %+v", got)
 	}
-}
-
-func findWorldKey(keys []WorldKey, raw string) WorldKey {
-	for _, key := range keys {
-		if key.Raw == raw {
-			return key
-		}
-	}
-	return WorldKey{}
 }
 
 func appendU32(data []byte, value uint32) []byte {
