@@ -273,8 +273,28 @@ func textEntry(r *reader) TextEntry {
 	return TextEntry{Key: r.str(), Value: r.str()}
 }
 
+func station(r *reader) Station {
+	return Station{Name: r.str(), Level: r.u32()}
+}
+
+func biome(r *reader) uint32 {
+	return r.u32()
+}
+
 func food(r *reader) Food {
 	return Food{Name: r.str(), Time: r.f32()}
+}
+
+func skill(r *reader) Skill {
+	skillType := r.i32()
+	level := r.f32()
+	return Skill{
+		Type:         skillType,
+		Name:         skillName(skillType),
+		Level:        level,
+		DisplayLevel: int32(math.Floor(float64(level))),
+		Accumulator:  r.f32(),
+	}
 }
 
 func worldKey(r *reader) WorldKey {
@@ -289,21 +309,13 @@ func worldKey(r *reader) WorldKey {
 
 func readPlayerTail(r *reader, p *PlayerData) {
 	p.KnownRecipes = r.stringList()
-	stationCount := r.u32()
-	p.KnownStations = make([]Station, 0, stationCount)
-	for range stationCount {
-		p.KnownStations = append(p.KnownStations, Station{Name: r.str(), Level: r.u32()})
-	}
+	p.KnownStations = readList(r, station)
 	p.KnownMaterials = r.stringList()
 	p.ShownTutorials = r.stringList()
 	p.Uniques = r.stringList()
 	p.Trophies = r.stringList()
 
-	biomeCount := r.u32()
-	p.KnownBiomes = make([]uint32, 0, biomeCount)
-	for range biomeCount {
-		p.KnownBiomes = append(p.KnownBiomes, r.u32())
-	}
+	p.KnownBiomes = readList(r, biome)
 
 	p.PlayerKnownTexts = readList(r, textEntry)
 
@@ -316,19 +328,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	p.Foods = readList(r, food)
 
 	p.SkillVersion = r.u32()
-	skillCount := r.u32()
-	p.Skills = make([]Skill, 0, skillCount)
-	for range skillCount {
-		skillType := r.i32()
-		level := r.f32()
-		p.Skills = append(p.Skills, Skill{
-			Type:         skillType,
-			Name:         skillName(skillType),
-			Level:        level,
-			DisplayLevel: int32(math.Floor(float64(level))),
-			Accumulator:  r.f32(),
-		})
-	}
+	p.Skills = readList(r, skill)
 
 	p.CustomData = readList(r, textEntry)
 	if r.remaining() >= 8 {
