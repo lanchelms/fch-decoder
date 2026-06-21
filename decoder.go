@@ -237,12 +237,12 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.UsedCheats = r.bool()
 	p.DateCreatedUnix = int64(r.u64())
 
-	p.KnownWorlds = readKeyedFloats(r, timedEntry)
-	p.KnownWorldKeys = readKeyedFloats(r, worldKey)
-	p.KnownCommands = readKeyedFloats(r, statEntry)
-	p.EnemyStats = readKeyedFloats(r, statEntry)
-	p.MaterialStats = readKeyedFloats(r, statEntry)
-	p.RecipeStats = readKeyedFloats(r, statEntry)
+	p.KnownWorlds = readList(r, timedEntry)
+	p.KnownWorldKeys = readList(r, worldKey)
+	p.KnownCommands = readList(r, statEntry)
+	p.EnemyStats = readList(r, statEntry)
+	p.MaterialStats = readList(r, statEntry)
+	p.RecipeStats = readList(r, statEntry)
 	readPlayerState(r, &p)
 	p.Inventory = readInventory(r)
 	readPlayerTail(r, &p)
@@ -252,24 +252,34 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	return p, nil
 }
 
-func readKeyedFloats[T any](r *reader, convert func(string, float32) T) []T {
+func readList[T any](r *reader, read func(*reader) T) []T {
 	count := r.u32()
 	out := make([]T, 0, count)
 	for range count {
-		out = append(out, convert(r.str(), r.f32()))
+		out = append(out, read(r))
 	}
 	return out
 }
 
-func statEntry(name string, value float32) StatEntry {
-	return StatEntry{Name: name, Value: value}
+func statEntry(r *reader) StatEntry {
+	return StatEntry{Name: r.str(), Value: r.f32()}
 }
 
-func timedEntry(name string, seconds float32) TimedEntry {
-	return TimedEntry{Name: name, Seconds: seconds}
+func timedEntry(r *reader) TimedEntry {
+	return TimedEntry{Name: r.str(), Seconds: r.f32()}
 }
 
-func worldKey(raw string, seconds float32) WorldKey {
+func textEntry(r *reader) TextEntry {
+	return TextEntry{Key: r.str(), Value: r.str()}
+}
+
+func food(r *reader) Food {
+	return Food{Name: r.str(), Time: r.f32()}
+}
+
+func worldKey(r *reader) WorldKey {
+	raw := r.str()
+	seconds := r.f32()
 	key, setting, ok := strings.Cut(raw, " ")
 	if !ok {
 		return WorldKey{Raw: raw, Seconds: seconds}
@@ -295,11 +305,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 		p.KnownBiomes = append(p.KnownBiomes, r.u32())
 	}
 
-	knownTextCount := r.u32()
-	p.PlayerKnownTexts = make([]TextEntry, 0, knownTextCount)
-	for range knownTextCount {
-		p.PlayerKnownTexts = append(p.PlayerKnownTexts, TextEntry{Key: r.str(), Value: r.str()})
-	}
+	p.PlayerKnownTexts = readList(r, textEntry)
 
 	p.Beard = r.str()
 	p.Hair = r.str()
@@ -307,11 +313,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	p.HairColor = r.vector3()
 	p.ModelIndex = r.u32()
 
-	foodCount := r.u32()
-	p.Foods = make([]Food, 0, foodCount)
-	for range foodCount {
-		p.Foods = append(p.Foods, Food{Name: r.str(), Time: r.f32()})
-	}
+	p.Foods = readList(r, food)
 
 	p.SkillVersion = r.u32()
 	skillCount := r.u32()
@@ -328,11 +330,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 		})
 	}
 
-	customDataCount := r.u32()
-	p.CustomData = make([]TextEntry, 0, customDataCount)
-	for range customDataCount {
-		p.CustomData = append(p.CustomData, TextEntry{Key: r.str(), Value: r.str()})
-	}
+	p.CustomData = readList(r, textEntry)
 	if r.remaining() >= 8 {
 		p.Stamina = r.f32()
 		p.MaxEitr = r.f32()
@@ -373,11 +371,7 @@ func readInventory(r *reader) []Item {
 			CrafterID:   r.u64(),
 			CrafterName: r.str(),
 		}
-		customDataCount := r.u32()
-		item.CustomData = make([]TextEntry, 0, customDataCount)
-		for range customDataCount {
-			item.CustomData = append(item.CustomData, TextEntry{Key: r.str(), Value: r.str()})
-		}
+		item.CustomData = readList(r, textEntry)
 		item.WorldLevel = r.u32()
 		item.PickedUp = r.bool()
 		out = append(out, item)
