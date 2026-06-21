@@ -251,12 +251,12 @@ func decodePlayer(r *reader) (PlayerData, error) {
 }
 
 func readPlayerTail(r *reader, p *PlayerData) {
-	p.KnownRecipes = r.stringList()
+	p.KnownRecipes = readList(r, str)
 	p.KnownStations = readList(r, station)
-	p.KnownMaterials = r.stringList()
-	p.ShownTutorials = r.stringList()
-	p.Uniques = r.stringList()
-	p.Trophies = r.stringList()
+	p.KnownMaterials = readList(r, str)
+	p.ShownTutorials = readList(r, str)
+	p.Uniques = readList(r, str)
+	p.Trophies = readList(r, str)
 
 	p.KnownBiomes = readList(r, biome)
 

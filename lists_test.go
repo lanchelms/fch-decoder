@@ -21,6 +21,18 @@ func TestReadList(t *testing.T) {
 	}
 }
 
+func TestReadListStrings(t *testing.T) {
+	data := appendU32(nil, 2)
+	data = appendString(data, "one")
+	data = appendString(data, "two")
+
+	got := readList(newReader(data), str)
+	want := []string{"one", "two"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("readList strings = %#v, want %#v", got, want)
+	}
+}
+
 func TestListReaders(t *testing.T) {
 	tests := []struct {
 		name string

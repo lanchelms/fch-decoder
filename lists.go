@@ -14,6 +14,10 @@ func readList[T any](r *reader, read func(*reader) T) []T {
 	return out
 }
 
+func str(r *reader) string {
+	return r.str()
+}
+
 func statEntry(r *reader) StatEntry {
 	return StatEntry{Name: r.str(), Value: r.f32()}
 }

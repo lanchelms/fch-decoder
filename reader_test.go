@@ -69,22 +69,6 @@ func TestReaderStringLong7BitLength(t *testing.T) {
 	}
 }
 
-func TestReaderStringList(t *testing.T) {
-	r := newReader([]byte{
-		0x02, 0x00, 0x00, 0x00,
-		0x03, 'o', 'n', 'e',
-		0x03, 't', 'w', 'o',
-	})
-
-	got := r.stringList()
-	if len(got) != 2 || got[0] != "one" || got[1] != "two" {
-		t.Fatalf("stringList = %#v, want [one two]", got)
-	}
-	if got := r.remaining(); got != 0 {
-		t.Fatalf("remaining = %d, want 0", got)
-	}
-}
-
 func TestReaderUnexpectedEOF(t *testing.T) {
 	r := newReader([]byte{0x01, 0x02, 0x03})
 

@@ -89,15 +89,6 @@ func (r *reader) str() string {
 	return string(b)
 }
 
-func (r *reader) stringList() []string {
-	count := r.u32()
-	out := make([]string, 0, count)
-	for range count {
-		out = append(out, r.str())
-	}
-	return out
-}
-
 func (r *reader) vector3() Vector3 {
 	return Vector3{X: r.f32(), Y: r.f32(), Z: r.f32()}
 }
