@@ -18,10 +18,10 @@ go get github.com/lanchelms/fch-decoder
 go install github.com/lanchelms/fch-decoder/cmd/fchdump@latest
 ```
 
-Or build the container image from the repository root:
+Or pull the published container image:
 
 ```sh
-docker build -f cmd/fchdump/Dockerfile -t fchdump .
+docker pull ghcr.io/lanchelms/fch-decoder-fchdump:latest
 ```
 
 ### Prometheus Exporter
@@ -30,10 +30,10 @@ docker build -f cmd/fchdump/Dockerfile -t fchdump .
 go install github.com/lanchelms/fch-decoder/cmd/fchprom@latest
 ```
 
-Or build the container image from the repository root:
+Or pull the published container image:
 
 ```sh
-docker build -f cmd/fchprom/Dockerfile -t fchprom .
+docker pull ghcr.io/lanchelms/fch-decoder-fchprom:latest
 ```
 
 ## Library
@@ -77,7 +77,8 @@ fchdump 'testdata/Steam_222222_bortson.fch'
 Container example:
 
 ```sh
-docker run --rm -v "$PWD/testdata:/data:ro" fchdump /data/Steam_222222_bortson.fch
+docker run --rm -v "$PWD/testdata:/data:ro" \
+  ghcr.io/lanchelms/fch-decoder-fchdump:latest /data/Steam_222222_bortson.fch
 ```
 
 ## Prometheus Exporter
@@ -93,7 +94,7 @@ Container example:
 ```sh
 docker run --rm -p 9108:9108 \
   -v "$HOME/.config/unity3d/IronGate/Valheim/characters_local:/characters:ro" \
-  fchprom -dir /characters -addr :9108
+  ghcr.io/lanchelms/fch-decoder-fchprom:latest -dir /characters -addr :9108
 ```
 
 Example metric series:
