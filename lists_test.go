@@ -107,7 +107,7 @@ func TestListReaders(t *testing.T) {
 }
 
 func TestDecodeConvertedListsFromSample(t *testing.T) {
-	f, err := os.Open(filepath.Join("testdata", "Steam_76561198018104185_bortson.fch"))
+	f, err := os.Open(filepath.Join("testdata", "Steam_222222_bortson.fch"))
 	if err != nil {
 		t.Fatal(err)
 	}

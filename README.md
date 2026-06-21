@@ -71,13 +71,13 @@ func main() {
 `fchdump` decodes one character file and writes formatted JSON to stdout.
 
 ```sh
-fchdump 'testdata/Steam_76561198018104185_bortson.fch'
+fchdump 'testdata/Steam_222222_bortson.fch'
 ```
 
 Container example:
 
 ```sh
-docker run --rm -v "$PWD/testdata:/data:ro" fchdump /data/Steam_76561198018104185_bortson.fch
+docker run --rm -v "$PWD/testdata:/data:ro" fchdump /data/Steam_222222_bortson.fch
 ```
 
 ## Prometheus Exporter

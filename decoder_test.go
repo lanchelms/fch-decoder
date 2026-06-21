@@ -29,9 +29,9 @@ func TestDecodeSamples(t *testing.T) {
 		playerLength    uint32
 	}{
 		{
-			file:            "Steam_76561197968487130_fenris bueller.fch",
+			file:            "Steam_111111_fenris bueller.fch",
 			name:            "Fenris Bueller",
-			playerID:        3289368200,
+			playerID:        111111,
 			inventory:       16,
 			materials:       108,
 			recipes:         35,
@@ -46,9 +46,9 @@ func TestDecodeSamples(t *testing.T) {
 			playerLength:    7593,
 		},
 		{
-			file:            "Steam_76561198018104185_bortson.fch",
+			file:            "Steam_222222_bortson.fch",
 			name:            "Bortson",
-			playerID:        1835310974,
+			playerID:        222222,
 			inventory:       16,
 			materials:       141,
 			recipes:         54,
@@ -63,9 +63,9 @@ func TestDecodeSamples(t *testing.T) {
 			playerLength:    10122,
 		},
 		{
-			file:            "Steam_76561197962555781_tugen.fch",
+			file:            "Steam_333333_tugen.fch",
 			name:            "Tugen",
-			playerID:        18446744072835061465,
+			playerID:        333333,
 			inventory:       23,
 			materials:       126,
 			recipes:         43,

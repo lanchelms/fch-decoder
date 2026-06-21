@@ -13,9 +13,9 @@ import (
 func TestCharacterFilesFiltersBackups(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{
-		"Steam_123_name.fch",
-		"Steam_123_name_backup_auto-638856016000.fch",
-		"Steam_123_name.fch.old",
+		"Steam_111111_name.fch",
+		"Steam_111111_name_backup_auto-638856016000.fch",
+		"Steam_111111_name.fch.old",
 		"not-a-character.txt",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
@@ -27,8 +27,8 @@ func TestCharacterFilesFiltersBackups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || filepath.Base(got[0]) != "Steam_123_name.fch" {
-		t.Fatalf("characterFiles() = %#v, want only Steam_123_name.fch", got)
+	if len(got) != 1 || filepath.Base(got[0]) != "Steam_111111_name.fch" {
+		t.Fatalf("characterFiles() = %#v, want only Steam_111111_name.fch", got)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestAllowedPlayerStatsAreChoosy(t *testing.T) {
 }
 
 func TestDistanceMetricsInferSailingDistance(t *testing.T) {
-	character, err := loadMetrics(filepath.Join("..", "..", "testdata", "Steam_76561197962555781_tugen.fch"))
+	character, err := loadMetrics(filepath.Join("..", "..", "testdata", "Steam_333333_tugen.fch"))
 	if err != nil {
 		t.Fatal(err)
 	}
