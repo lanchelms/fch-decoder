@@ -10,7 +10,6 @@ import (
 type reader struct {
 	data []byte
 	pos  int
-	err  error
 }
 
 func newReader(data []byte) *reader {
@@ -25,19 +24,12 @@ func (r *reader) remaining() int {
 }
 
 func (r *reader) need(n int) bool {
-	if r.err != nil {
-		return false
-	}
-	if n < 0 || r.pos+n > len(r.data) {
-		r.err = io.ErrUnexpectedEOF
-		return false
-	}
-	return true
+	return n >= 0 && r.pos+n <= len(r.data)
 }
 
 func (r *reader) bytes(n int) []byte {
 	if !r.need(n) {
-		return nil
+		panic(io.ErrUnexpectedEOF)
 	}
 	b := r.data[r.pos : r.pos+n]
 	r.pos += n
@@ -45,11 +37,7 @@ func (r *reader) bytes(n int) []byte {
 }
 
 func (r *reader) u32() uint32 {
-	b := r.bytes(4)
-	if b == nil {
-		return 0
-	}
-	return binary.LittleEndian.Uint32(b)
+	return binary.LittleEndian.Uint32(r.bytes(4))
 }
 
 func (r *reader) i32() int32 {
@@ -57,11 +45,7 @@ func (r *reader) i32() int32 {
 }
 
 func (r *reader) u64() uint64 {
-	b := r.bytes(8)
-	if b == nil {
-		return 0
-	}
-	return binary.LittleEndian.Uint64(b)
+	return binary.LittleEndian.Uint64(r.bytes(8))
 }
 
 func (r *reader) f32() float32 {
@@ -73,18 +57,11 @@ func (r *reader) bool() bool {
 }
 
 func (r *reader) byte() byte {
-	b := r.bytes(1)
-	if len(b) != 1 {
-		return 0
-	}
-	return b[0]
+	return r.bytes(1)[0]
 }
 
 func (r *reader) str() string {
 	n := r.read7BitEncodedInt()
-	if r.err != nil {
-		return ""
-	}
 	b := r.bytes(n)
 	return string(b)
 }
@@ -97,16 +74,12 @@ func (r *reader) read7BitEncodedInt() int {
 	var count uint32
 	var shift uint
 	for shift != 35 {
-		b := r.bytes(1)
-		if b == nil {
-			return 0
-		}
-		count |= uint32(b[0]&0x7f) << shift
-		if b[0]&0x80 == 0 {
+		b := r.byte()
+		count |= uint32(b&0x7f) << shift
+		if b&0x80 == 0 {
 			return int(count)
 		}
 		shift += 7
 	}
-	r.err = fmt.Errorf("fch: invalid 7-bit encoded integer")
-	return 0
+	panic(fmt.Errorf("fch: invalid 7-bit encoded integer"))
 }

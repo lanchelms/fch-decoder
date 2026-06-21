@@ -162,9 +162,6 @@ func DecodeBytes(data []byte) (*Character, error) {
 	c.FileLength = rd.u32()
 	c.Version = rd.u32()
 	c.PlayerStatCount = rd.u32()
-	if rd.err != nil {
-		return nil, rd.err
-	}
 	if int(c.FileLength)+trailerSize != len(data) {
 		return nil, fmt.Errorf("fch: length header %d does not match file size %d", c.FileLength, len(data))
 	}
@@ -198,9 +195,6 @@ func DecodeBytes(data []byte) (*Character, error) {
 		return nil, fmt.Errorf("fch: unexpected trailer hash length %d", c.Trailer.Length)
 	}
 	c.Trailer.Hash = append([]byte(nil), tr.bytes(64)...)
-	if tr.err != nil {
-		return nil, tr.err
-	}
 	return c, nil
 }
 
@@ -244,9 +238,6 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	readPlayerState(r, &p)
 	p.Inventory = readInventory(r)
 	readPlayerTail(r, &p)
-	if r.err != nil {
-		return p, r.err
-	}
 	return p, nil
 }
 

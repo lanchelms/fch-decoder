@@ -38,9 +38,6 @@ func TestReaderPrimitives(t *testing.T) {
 	if got := r.remaining(); got != 0 {
 		t.Fatalf("remaining = %d, want 0", got)
 	}
-	if r.err != nil {
-		t.Fatalf("err = %v, want nil", r.err)
-	}
 }
 
 func TestReaderString(t *testing.T) {
@@ -72,33 +69,21 @@ func TestReaderStringLong7BitLength(t *testing.T) {
 func TestReaderUnexpectedEOF(t *testing.T) {
 	r := newReader([]byte{0x01, 0x02, 0x03})
 
-	if got := r.u32(); got != 0 {
-		t.Fatalf("u32 = %d, want 0 on EOF", got)
-	}
-	if !errors.Is(r.err, io.ErrUnexpectedEOF) {
-		t.Fatalf("err = %v, want unexpected EOF", r.err)
-	}
+	err := mustPanic(t, func() { r.u32() })
 	if got := r.remaining(); got != 3 {
 		t.Fatalf("remaining = %d, want 3 after failed read", got)
 	}
-
-	r.byte()
-	if !errors.Is(r.err, io.ErrUnexpectedEOF) {
-		t.Fatalf("err after second read = %v, want original unexpected EOF", r.err)
-	}
-	if got := r.remaining(); got != 3 {
-		t.Fatalf("remaining after second read = %d, want 3", got)
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("panic = %v, want unexpected EOF", err)
 	}
 }
 
 func TestReaderInvalid7BitEncodedInt(t *testing.T) {
 	r := newReader([]byte{0x80, 0x80, 0x80, 0x80, 0x80})
 
-	if got := r.str(); got != "" {
-		t.Fatalf("str = %q, want empty on invalid length", got)
-	}
-	if r.err == nil {
-		t.Fatal("err = nil, want invalid 7-bit encoded integer")
+	err := mustPanic(t, func() { r.str() })
+	if err == nil || err.Error() != "fch: invalid 7-bit encoded integer" {
+		t.Fatalf("panic = %v, want invalid 7-bit encoded integer", err)
 	}
 }
 
@@ -107,9 +92,6 @@ func TestReaderNeedRejectsNegativeLength(t *testing.T) {
 
 	if r.need(-1) {
 		t.Fatal("need(-1) = true, want false")
-	}
-	if !errors.Is(r.err, io.ErrUnexpectedEOF) {
-		t.Fatalf("err = %v, want unexpected EOF", r.err)
 	}
 }
 
@@ -127,4 +109,21 @@ func bytesOf(b byte, n int) []byte {
 		out[i] = b
 	}
 	return out
+}
+
+func mustPanic(t *testing.T, fn func()) (err error) {
+	t.Helper()
+	defer func() {
+		v := recover()
+		if v == nil {
+			t.Fatal("function did not panic")
+		}
+		var ok bool
+		err, ok = v.(error)
+		if !ok {
+			t.Fatalf("panic = %#v, want error", v)
+		}
+	}()
+	fn()
+	return nil
 }
