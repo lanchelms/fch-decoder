@@ -96,4 +96,15 @@ docker run --rm -p 9108:9108 \
   fchprom -dir /characters -addr :9108
 ```
 
-The exporter reports skills, recipe counters, enemy counters, selected player stats, inferred distance metrics, and scrape errors. It ignores `.fch.old` and `backup_auto-*.fch` files.
+Example metric series:
+
+```prometheus
+valheim_character_skills{player="Bortson",skill="Run"}
+valheim_character_crafting{player="Bortson",recipe="AxeStone"}
+valheim_character_enemies{player="Bortson",enemy="Greyling"}
+valheim_character_stats{player="Bortson",stat="ArrowsShot"}
+valheim_character_distance{player="Bortson",mode="Total"}
+valheim_character_scrape_errors
+```
+
+The exporter ignores `.fch.old` and `backup_auto-*.fch` files.
