@@ -2,12 +2,17 @@ package fch
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
 	"io"
 )
 
-const trailerSize = 72
+const (
+	fileLengthSize = 4
+	trailerSize    = 68
+	fileOverhead   = fileLengthSize + trailerSize
+)
 
 type Character struct {
 	FileLength      uint32      `json:"fileLength"`
@@ -27,10 +32,10 @@ type MapSection struct {
 }
 
 type Trailer struct {
-	Offset  int    `json:"offset"`
-	Unknown uint32 `json:"unknown"`
-	Length  uint32 `json:"length"`
-	Hash    []byte `json:"hash"`
+	Offset    int    `json:"offset"`
+	Length    uint32 `json:"length"`
+	Hash      []byte `json:"hash"`
+	HashValid bool   `json:"hashValid"`
 }
 
 type PlayerData struct {
@@ -153,7 +158,7 @@ func Decode(r io.Reader) (*Character, error) {
 }
 
 func DecodeBytes(data []byte) (*Character, error) {
-	if len(data) < trailerSize+16 {
+	if len(data) < fileOverhead+16 {
 		return nil, fmt.Errorf("fch: file too short: %d bytes", len(data))
 	}
 
@@ -162,7 +167,8 @@ func DecodeBytes(data []byte) (*Character, error) {
 	c.FileLength = rd.u32()
 	c.Version = rd.u32()
 	c.PlayerStatCount = rd.u32()
-	if int(c.FileLength)+trailerSize != len(data) {
+	payloadEnd := fileLengthSize + int(c.FileLength)
+	if int(c.FileLength)+fileOverhead != len(data) {
 		return nil, fmt.Errorf("fch: length header %d does not match file size %d", c.FileLength, len(data))
 	}
 
@@ -172,13 +178,13 @@ func DecodeBytes(data []byte) (*Character, error) {
 		c.PlayerStats = append(c.PlayerStats, StatEntry{Name: playerStatName(i), Value: value})
 	}
 
-	mapSection, playerOffset, err := readMapSection(data, rd.pos)
+	mapSection, playerOffset, err := readMapSection(data, rd.pos, payloadEnd)
 	if err != nil {
 		return nil, err
 	}
 	c.Map = mapSection
 
-	pr := newReader(data[playerOffset : len(data)-trailerSize])
+	pr := newReader(data[playerOffset:payloadEnd])
 	player, err := decodePlayer(pr)
 	if err != nil {
 		return nil, fmt.Errorf("fch: player section at offset %d: %w", playerOffset+pr.pos, err)
@@ -186,19 +192,24 @@ func DecodeBytes(data []byte) (*Character, error) {
 	c.Player = player
 	c.RemainingBytes = pr.remaining()
 
-	trailerOffset := len(data) - trailerSize
+	trailerOffset := payloadEnd
 	tr := newReader(data[trailerOffset:])
 	c.Trailer.Offset = trailerOffset
-	c.Trailer.Unknown = tr.u32()
 	c.Trailer.Length = tr.u32()
 	if c.Trailer.Length != 64 {
 		return nil, fmt.Errorf("fch: unexpected trailer hash length %d", c.Trailer.Length)
 	}
 	c.Trailer.Hash = append([]byte(nil), tr.bytes(64)...)
+	c.Trailer.HashValid = bytes.Equal(currentPayloadHash(data, c.FileLength), c.Trailer.Hash)
 	return c, nil
 }
 
-func readMapSection(data []byte, startOffset int) (MapSection, int, error) {
+func currentPayloadHash(data []byte, payloadLen uint32) []byte {
+	sum := sha512.Sum512(data[fileLengthSize : fileLengthSize+int(payloadLen)])
+	return sum[:]
+}
+
+func readMapSection(data []byte, startOffset int, payloadEnd int) (MapSection, int, error) {
 	gzipOffset := bytes.Index(data[startOffset:], []byte{0x1f, 0x8b, 0x08})
 	if gzipOffset < 0 {
 		return MapSection{}, 0, fmt.Errorf("fch: gzip map block not found")
@@ -210,7 +221,7 @@ func readMapSection(data []byte, startOffset int) (MapSection, int, error) {
 
 	storedLen := binary.LittleEndian.Uint32(data[gzipOffset-12 : gzipOffset-8])
 	compressedLen := binary.LittleEndian.Uint32(data[gzipOffset-4 : gzipOffset])
-	if gzipOffset+int(compressedLen) > len(data)-trailerSize {
+	if gzipOffset+int(compressedLen) > payloadEnd {
 		return MapSection{}, 0, fmt.Errorf("fch: invalid compressed map length %d at offset %d", compressedLen, gzipOffset)
 	}
 

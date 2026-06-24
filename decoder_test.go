@@ -240,10 +240,30 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Trailer.Length != 64 || len(got.Trailer.Hash) != 64 {
 				t.Fatalf("bad trailer: length=%d hash=%d", got.Trailer.Length, len(got.Trailer.Hash))
 			}
+			if !got.Trailer.HashValid {
+				t.Fatal("Trailer.HashValid = false, want true")
+			}
 			if got.RemainingBytes != 0 {
 				t.Fatalf("RemainingBytes = %d, want 0", got.RemainingBytes)
 			}
 		})
+	}
+}
+
+func TestDecodeDetectsInvalidTrailerHash(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "Steam_333333_tugen.fch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append([]byte(nil), data...)
+	data[12] ^= 1
+
+	got, err := DecodeBytes(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Trailer.HashValid {
+		t.Fatal("Trailer.HashValid = true, want false")
 	}
 }
 

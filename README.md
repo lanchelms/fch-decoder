@@ -66,6 +66,9 @@ func main() {
 }
 ```
 
+The decoded trailer includes `hashValid`, which verifies Valheim's current
+SHA-512 trailer hash over the inner character payload bytes.
+
 ## CLI
 
 `fchdump` decodes one character file and writes formatted JSON to stdout.
