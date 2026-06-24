@@ -1,5 +1,7 @@
 package fch
 
+import "strings"
+
 var skillNames = map[int32]string{
 	0:   "None",
 	1:   "Swords",
@@ -31,6 +33,15 @@ var skillNames = map[int32]string{
 
 func skillName(skillType int32) string {
 	return skillNames[skillType]
+}
+
+func SkillTypeByName(name string) (int32, bool) {
+	for skillType, skillName := range skillNames {
+		if strings.EqualFold(skillName, name) {
+			return skillType, true
+		}
+	}
+	return 0, false
 }
 
 var playerStatNames = []string{
@@ -146,4 +157,13 @@ func playerStatName(index int) string {
 		return ""
 	}
 	return playerStatNames[index]
+}
+
+func PlayerStatIndexByName(name string) (int, bool) {
+	for i, statName := range playerStatNames {
+		if strings.EqualFold(statName, name) {
+			return i, true
+		}
+	}
+	return 0, false
 }

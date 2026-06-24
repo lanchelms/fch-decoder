@@ -149,6 +149,44 @@ func TestEncodeRehashesMutatedPayload(t *testing.T) {
 	}
 }
 
+func TestEncodeRecalculatesPlayerDataLength(t *testing.T) {
+	original, err := os.ReadFile(filepath.Join("testdata", "Steam_333333_tugen.fch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	character, err := DecodeBytes(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	character.Player.Inventory = append(character.Player.Inventory, Item{
+		Name:        "Wood",
+		Stack:       50,
+		Durability:  1,
+		Quality:     1,
+		CrafterName: "fchedit",
+		PickedUp:    true,
+	})
+
+	encoded, err := EncodeBytes(character)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeBytes(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decoded.Player.PlayerDataLength <= character.Player.PlayerDataLength {
+		t.Fatalf("PlayerDataLength = %d, want greater than original %d", decoded.Player.PlayerDataLength, character.Player.PlayerDataLength)
+	}
+	if len(decoded.Player.Inventory) != len(character.Player.Inventory) {
+		t.Fatalf("Inventory = %d, want %d", len(decoded.Player.Inventory), len(character.Player.Inventory))
+	}
+	if !decoded.Trailer.HashValid {
+		t.Fatal("Trailer.HashValid = false, want true")
+	}
+}
+
 func TestEncodeRejectsNilCharacter(t *testing.T) {
 	_, err := EncodeBytes(nil)
 	if err == nil || err.Error() != "fch: cannot encode nil character" {

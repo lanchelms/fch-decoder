@@ -81,14 +81,29 @@ func (e *encoder) player(p PlayerData) error {
 	writeList(e.w, p.EnemyStats, e.statEntry)
 	writeList(e.w, p.MaterialStats, e.statEntry)
 	writeList(e.w, p.RecipeStats, e.statEntry)
-	e.playerState(p)
-	e.inventory(p.Inventory)
-	return e.playerTail(p)
+	return e.playerData(p)
 }
 
-func (e *encoder) playerState(p PlayerData) {
+func (e *encoder) playerData(p PlayerData) error {
 	e.w.bool(p.HasPlayerData)
-	e.w.u32(p.PlayerDataLength)
+	if !p.HasPlayerData {
+		return nil
+	}
+
+	playerData := newEncoder()
+	if err := playerData.playerDataPayload(p); err != nil {
+		return err
+	}
+	data := playerData.w.data()
+	if len(data) > math.MaxUint32 {
+		return fmt.Errorf("fch: player data too large: %d bytes", len(data))
+	}
+	e.w.u32(uint32(len(data)))
+	e.w.bytes(data)
+	return nil
+}
+
+func (e *encoder) playerDataPayload(p PlayerData) error {
 	e.w.u32(p.PlayerVersion)
 	e.w.f32(p.MaxHealth)
 	e.w.f32(p.Health)
@@ -97,6 +112,8 @@ func (e *encoder) playerState(p PlayerData) {
 	e.w.str(p.GuardianPower.Name)
 	e.w.f32(p.GuardianPower.Cooldown)
 	e.w.u32(p.InventoryVersion)
+	e.inventory(p.Inventory)
+	return e.playerTail(p)
 }
 
 func (e *encoder) inventory(items []Item) {
