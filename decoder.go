@@ -2,7 +2,6 @@ package fch
 
 import (
 	"bytes"
-	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -29,6 +28,7 @@ type MapSection struct {
 	Offset           int    `json:"offset"`
 	CompressedLength uint32 `json:"compressedLength"`
 	StoredLength     uint32 `json:"storedLength"`
+	Raw              []byte `json:"-"`
 }
 
 type Trailer struct {
@@ -80,6 +80,7 @@ type PlayerData struct {
 	SkillVersion     uint32        `json:"skillVersion,omitempty"`
 	Skills           []Skill       `json:"skills,omitempty"`
 	CustomData       []TextEntry   `json:"customData,omitempty"`
+	tailFloatCount   int
 }
 
 type StatEntry struct {
@@ -205,8 +206,7 @@ func DecodeBytes(data []byte) (*Character, error) {
 }
 
 func currentPayloadHash(data []byte, payloadLen uint32) []byte {
-	sum := sha512.Sum512(data[fileLengthSize : fileLengthSize+int(payloadLen)])
-	return sum[:]
+	return payloadHash(data[fileLengthSize : fileLengthSize+int(payloadLen)])
 }
 
 func readMapSection(data []byte, startOffset int, payloadEnd int) (MapSection, int, error) {
@@ -229,6 +229,7 @@ func readMapSection(data []byte, startOffset int, payloadEnd int) (MapSection, i
 		Offset:           gzipOffset,
 		CompressedLength: compressedLen,
 		StoredLength:     storedLen,
+		Raw:              append([]byte(nil), data[startOffset:gzipOffset+int(compressedLen)]...),
 	}, gzipOffset + int(compressedLen), nil
 }
 
@@ -279,9 +280,11 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	if r.remaining() >= 8 {
 		p.Stamina = r.f32()
 		p.MaxEitr = r.f32()
+		p.tailFloatCount = 2
 	}
 	if r.remaining() >= 4 {
 		p.Eitr = r.f32()
+		p.tailFloatCount = 3
 	}
 }
 

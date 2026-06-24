@@ -14,6 +14,13 @@ func readList[T any](r *reader, read func(*reader) T) []T {
 	return out
 }
 
+func writeList[T any](w *writer, values []T, write func(T)) {
+	w.u32(uint32(len(values)))
+	for _, value := range values {
+		write(value)
+	}
+}
+
 func str(r *reader) string {
 	return r.str()
 }
