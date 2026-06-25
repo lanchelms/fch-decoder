@@ -33,8 +33,8 @@ func TestParseInventoryItemDefaults(t *testing.T) {
 	}
 }
 
-func TestParseStatAssignment(t *testing.T) {
-	assignment, err := ParseStatAssignment(" Deaths = 5 ")
+func TestParseAssignment(t *testing.T) {
+	assignment, err := ParseAssignment(" Deaths = 5 ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,30 +43,30 @@ func TestParseStatAssignment(t *testing.T) {
 	}
 }
 
-func TestParseSkillType(t *testing.T) {
-	skillType, name, err := ParseSkillType("Run")
+func TestParseSkillRef(t *testing.T) {
+	skill, err := ParseSkillRef("Run")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if skillType != 102 || name != "Run" {
-		t.Fatalf("ParseSkillType = %d, %q", skillType, name)
+	if skill.Type != 102 || skill.Name != "Run" {
+		t.Fatalf("ParseSkillRef = %+v", skill)
 	}
 
-	skillType, name, err = ParseSkillType("123")
+	skill, err = ParseSkillRef("123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if skillType != 123 || name != "123" {
-		t.Fatalf("ParseSkillType numeric = %d, %q", skillType, name)
+	if skill.Type != 123 || skill.Name != "123" {
+		t.Fatalf("ParseSkillRef numeric = %+v", skill)
 	}
 }
 
-func TestParsePlayerStatIndex(t *testing.T) {
-	index, name, err := ParsePlayerStatIndex("Builds")
+func TestParsePlayerStatRef(t *testing.T) {
+	stat, err := ParsePlayerStatRef("Builds")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if index != 2 || name != "Builds" {
-		t.Fatalf("ParsePlayerStatIndex = %d, %q", index, name)
+	if stat.Index != 2 || stat.Name != "Builds" {
+		t.Fatalf("ParsePlayerStatRef = %+v", stat)
 	}
 }

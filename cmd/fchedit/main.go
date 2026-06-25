@@ -74,7 +74,7 @@ func (op setPlayerStatOp) apply(c *fch.Character) error {
 type statSetter func(*fch.Character, string, float32)
 
 type setStatOp struct {
-	assignment fch.StatAssignment
+	assignment fch.Assignment
 	set        statSetter
 }
 
@@ -168,32 +168,32 @@ func parseRemoveInventory(value string) (editOp, error) {
 }
 
 func parseSetSkillLevel(value string) (editOp, error) {
-	assignment, err := fch.ParseStatAssignment(value)
+	assignment, err := fch.ParseAssignment(value)
 	if err != nil {
 		return nil, err
 	}
-	skillType, skillName, err := fch.ParseSkillType(assignment.Name)
+	skill, err := fch.ParseSkillRef(assignment.Name)
 	if err != nil {
 		return nil, err
 	}
-	return setSkillLevelOp{skillType: skillType, name: skillName, level: assignment.Value}, nil
+	return setSkillLevelOp{skillType: skill.Type, name: skill.Name, level: assignment.Value}, nil
 }
 
 func parseSetPlayerStat(value string) (editOp, error) {
-	assignment, err := fch.ParseStatAssignment(value)
+	assignment, err := fch.ParseAssignment(value)
 	if err != nil {
 		return nil, err
 	}
-	index, statName, err := fch.ParsePlayerStatIndex(assignment.Name)
+	stat, err := fch.ParsePlayerStatRef(assignment.Name)
 	if err != nil {
 		return nil, err
 	}
-	return setPlayerStatOp{index: index, name: statName, value: assignment.Value}, nil
+	return setPlayerStatOp{index: stat.Index, name: stat.Name, value: assignment.Value}, nil
 }
 
 func parseSetStat(set statSetter) func(string) (editOp, error) {
 	return func(value string) (editOp, error) {
-		assignment, err := fch.ParseStatAssignment(value)
+		assignment, err := fch.ParseAssignment(value)
 		if err != nil {
 			return nil, err
 		}

@@ -6,9 +6,19 @@ import (
 	"strings"
 )
 
-type StatAssignment struct {
+type Assignment struct {
 	Name  string
 	Value float32
+}
+
+type SkillRef struct {
+	Type int32
+	Name string
+}
+
+type PlayerStatRef struct {
+	Index int
+	Name  string
 }
 
 type inventoryItemParser struct {
@@ -100,48 +110,48 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 	return err
 }
 
-// ParseStatAssignment parses a name=value assignment with a float32 value.
-func ParseStatAssignment(value string) (StatAssignment, error) {
+// ParseAssignment parses a name=value assignment with a float32 value.
+func ParseAssignment(value string) (Assignment, error) {
 	name, raw, ok := strings.Cut(value, "=")
 	if !ok {
-		return StatAssignment{}, fmt.Errorf("expected name=value, got %q", value)
+		return Assignment{}, fmt.Errorf("expected name=value, got %q", value)
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return StatAssignment{}, fmt.Errorf("assignment name is required")
+		return Assignment{}, fmt.Errorf("assignment name is required")
 	}
 	amount, err := parseFloat32(strings.TrimSpace(raw))
 	if err != nil {
-		return StatAssignment{}, err
+		return Assignment{}, err
 	}
-	return StatAssignment{Name: name, Value: amount}, nil
+	return Assignment{Name: name, Value: amount}, nil
 }
 
-// ParseSkillType resolves either a numeric skill type or a known skill name.
-func ParseSkillType(value string) (int32, string, error) {
+// ParseSkillRef resolves either a numeric skill type or a known skill name.
+func ParseSkillRef(value string) (SkillRef, error) {
 	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
-		return int32(n), value, nil
+		return SkillRef{Type: int32(n), Name: value}, nil
 	}
 	skillType, ok := SkillTypeByName(value)
 	if !ok {
-		return 0, "", fmt.Errorf("unknown skill %q", value)
+		return SkillRef{}, fmt.Errorf("unknown skill %q", value)
 	}
-	return skillType, value, nil
+	return SkillRef{Type: skillType, Name: value}, nil
 }
 
-// ParsePlayerStatIndex resolves either a numeric player stat index or a known player stat name.
-func ParsePlayerStatIndex(value string) (int, string, error) {
+// ParsePlayerStatRef resolves either a numeric player stat index or a known player stat name.
+func ParsePlayerStatRef(value string) (PlayerStatRef, error) {
 	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
 		if n < 0 {
-			return 0, "", fmt.Errorf("invalid player stat index %d", n)
+			return PlayerStatRef{}, fmt.Errorf("invalid player stat index %d", n)
 		}
-		return int(n), value, nil
+		return PlayerStatRef{Index: int(n), Name: value}, nil
 	}
 	index, ok := PlayerStatIndexByName(value)
 	if !ok {
-		return 0, "", fmt.Errorf("unknown player stat %q", value)
+		return PlayerStatRef{}, fmt.Errorf("unknown player stat %q", value)
 	}
-	return index, value, nil
+	return PlayerStatRef{Index: index, Name: value}, nil
 }
 
 func parseFloat32(value string) (float32, error) {
