@@ -133,15 +133,6 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) error {
-	cli, ctx, err := parseCLI(args, stdout, stderr)
-	if err != nil {
-		return err
-	}
-	runner := &editRunner{path: cli.Character, out: cli.Out, stdout: stdout}
-	return ctx.Run(runner)
-}
-
-func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, *kong.Context, error) {
 	var cli cli
 	parser, err := kong.New(
 		&cli,
@@ -150,13 +141,14 @@ func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, *kong.Con
 		kong.Writers(stdout, stderr),
 	)
 	if err != nil {
-		return cli, nil, err
+		return err
 	}
 	ctx, err := parser.Parse(args)
 	if err != nil {
-		return cli, nil, err
+		return err
 	}
-	return cli, ctx, nil
+	runner := &editRunner{path: cli.Character, out: cli.Out, stdout: stdout}
+	return ctx.Run(runner)
 }
 
 func (r *editRunner) apply(edit func(*fch.Character) error) error {
