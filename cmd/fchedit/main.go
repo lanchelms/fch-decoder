@@ -10,10 +10,6 @@ import (
 	fch "github.com/lanchelms/fch-decoder"
 )
 
-type editOp interface {
-	apply(*fch.Character) error
-}
-
 const characterEnv = "CHARACTER"
 
 type cli struct {
@@ -33,11 +29,14 @@ type addInventoryCmd struct {
 }
 
 func (cmd *addInventoryCmd) Run(r *editRunner) error {
-	item, err := parseInventoryAction(addInventory, cmd.Item)
+	item, err := parseInventoryItem(cmd.Item)
 	if err != nil {
 		return err
 	}
-	return r.apply(inventoryOp{action: addInventory, item: item})
+	return r.apply(func(c *fch.Character) error {
+		c.AddInventoryItem(item)
+		return nil
+	})
 }
 
 type removeCmd struct {
@@ -49,11 +48,13 @@ type removeInventoryCmd struct {
 }
 
 func (cmd *removeInventoryCmd) Run(r *editRunner) error {
-	item, err := parseInventoryAction(removeInventory, cmd.Name)
+	name, err := parseInventoryName(cmd.Name)
 	if err != nil {
 		return err
 	}
-	return r.apply(inventoryOp{action: removeInventory, item: item})
+	return r.apply(func(c *fch.Character) error {
+		return c.RemoveInventoryItem(name)
+	})
 }
 
 type setCmd struct {
@@ -69,11 +70,14 @@ type setSkillCmd struct {
 }
 
 func (cmd *setSkillCmd) Run(r *editRunner) error {
-	op, err := newSetSkillLevelOp(cmd.Skill, cmd.Level)
+	skill, err := parseSkillRef(cmd.Skill)
 	if err != nil {
 		return err
 	}
-	return r.apply(op)
+	return r.apply(func(c *fch.Character) error {
+		c.SetSkillLevel(skill.skillType, skill.name, cmd.Level)
+		return nil
+	})
 }
 
 type setEnemyCmd struct {
@@ -82,10 +86,9 @@ type setEnemyCmd struct {
 }
 
 func (cmd *setEnemyCmd) Run(r *editRunner) error {
-	return r.apply(setStatOp{
-		name:  cmd.Name,
-		value: cmd.Value,
-		set:   (*fch.Character).UpsertEnemyStat,
+	return r.apply(func(c *fch.Character) error {
+		c.UpsertEnemyStat(cmd.Name, cmd.Value)
+		return nil
 	})
 }
 
@@ -95,10 +98,9 @@ type setMaterialCmd struct {
 }
 
 func (cmd *setMaterialCmd) Run(r *editRunner) error {
-	return r.apply(setStatOp{
-		name:  cmd.Name,
-		value: cmd.Value,
-		set:   (*fch.Character).UpsertMaterialStat,
+	return r.apply(func(c *fch.Character) error {
+		c.UpsertMaterialStat(cmd.Name, cmd.Value)
+		return nil
 	})
 }
 
@@ -108,69 +110,13 @@ type setPlayerStatCmd struct {
 }
 
 func (cmd *setPlayerStatCmd) Run(r *editRunner) error {
-	op, err := newSetPlayerStatOp(cmd.Stat, cmd.Value)
+	stat, err := parsePlayerStatRef(cmd.Stat)
 	if err != nil {
 		return err
 	}
-	return r.apply(op)
-}
-
-type inventoryAction int
-
-const (
-	addInventory inventoryAction = iota
-	removeInventory
-)
-
-type inventoryOp struct {
-	action inventoryAction
-	item   fch.Item
-}
-
-func (op inventoryOp) apply(c *fch.Character) error {
-	switch op.action {
-	case addInventory:
-		c.AddInventoryItem(op.item)
-		return nil
-	case removeInventory:
-		return c.RemoveInventoryItem(op.item.Name)
-	default:
-		return fmt.Errorf("unknown inventory action %d", op.action)
-	}
-}
-
-type setSkillLevelOp struct {
-	skillType int32
-	name      string
-	level     float32
-}
-
-func (op setSkillLevelOp) apply(c *fch.Character) error {
-	c.SetSkillLevel(op.skillType, op.name, op.level)
-	return nil
-}
-
-type setPlayerStatOp struct {
-	index int
-	name  string
-	value float32
-}
-
-func (op setPlayerStatOp) apply(c *fch.Character) error {
-	return c.SetPlayerStat(op.index, op.name, op.value)
-}
-
-type statSetter func(*fch.Character, string, float32)
-
-type setStatOp struct {
-	name  string
-	value float32
-	set   statSetter
-}
-
-func (op setStatOp) apply(c *fch.Character) error {
-	op.set(c, op.name, op.value)
-	return nil
+	return r.apply(func(c *fch.Character) error {
+		return c.SetPlayerStat(stat.index, stat.name, cmd.Value)
+	})
 }
 
 type editRunner struct {
@@ -213,23 +159,7 @@ func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, *kong.Con
 	return cli, ctx, nil
 }
 
-func newSetSkillLevelOp(name string, level float32) (editOp, error) {
-	skill, err := parseSkillRef(name)
-	if err != nil {
-		return nil, err
-	}
-	return setSkillLevelOp{skillType: skill.skillType, name: skill.name, level: level}, nil
-}
-
-func newSetPlayerStatOp(name string, value float32) (editOp, error) {
-	stat, err := parsePlayerStatRef(name)
-	if err != nil {
-		return nil, err
-	}
-	return setPlayerStatOp{index: stat.index, name: stat.name, value: value}, nil
-}
-
-func (r *editRunner) apply(op editOp) error {
+func (r *editRunner) apply(edit func(*fch.Character) error) error {
 	data, err := os.ReadFile(r.path)
 	if err != nil {
 		return err
@@ -238,7 +168,7 @@ func (r *editRunner) apply(op editOp) error {
 	if err != nil {
 		return err
 	}
-	if err := op.apply(character); err != nil {
+	if err := edit(character); err != nil {
 		return err
 	}
 	encoded, err := fch.EncodeBytes(character)
