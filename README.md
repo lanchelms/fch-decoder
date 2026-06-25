@@ -73,6 +73,8 @@ SHA-512 trailer hash over the inner character payload bytes.
 
 ## CLI
 
+### fchdump
+
 `fchdump` decodes one character file and writes formatted JSON to stdout.
 
 ```sh
@@ -93,44 +95,46 @@ docker run --rm -v "$PWD/testdata:/data:ro" \
   --character /data/Steam_222222_bortson.fch
 ```
 
+### fchedit
+
 `fchedit` decodes one character file, applies requested edits, recalculates
 the payload length and trailer hash, and writes the edited file in place by
 default. In-place edits create a numbered `.bak` backup next to the original.
 Use `--out` to write a copy instead.
 
 ```sh
-fchedit --character character.fch set player-stat Deaths 0
-fchedit --character character.fch set skill Run 50
-fchedit --character character.fch set enemy '$enemy_greydwarf' 25
-fchedit --character character.fch set material '$item_wood' 100
-fchedit --character character.fch add inventory 'Wood,stack=50,quality=1'
-fchedit --character character.fch remove inventory Stone
+export CHARACTER=character.fch
+
+fchedit set player-stat Deaths 0
+fchedit set skill Run 50
+fchedit set enemy '$enemy_greydwarf' 25
+fchedit set material '$item_wood' 100
+fchedit add inventory 'Wood,stack=50,quality=1'
+fchedit remove inventory Stone
 ```
 
-To avoid repeating the character file, set `CHARACTER`:
+You can also pass the character file explicitly with `--character`:
 
 ```sh
-export CHARACTER=character.fch
-fchedit set skill Run 50
-fchedit add inventory 'Wood,stack=50,quality=1'
+fchedit --character character.fch set skill Run 50
 ```
 
 To write a copy:
 
 ```sh
-fchedit --character character.fch --out edited.fch set skill Run 50
+fchedit --out edited.fch set skill Run 50
 ```
 
 To preview an edit without writing:
 
 ```sh
-fchedit --character character.fch --dry-run set skill Run 50
+fchedit --dry-run set skill Run 50
 ```
 
 To edit in place without creating a backup:
 
 ```sh
-fchedit --character character.fch --no-backup set skill Run 50
+fchedit --no-backup set skill Run 50
 ```
 
 To discover editable names:
@@ -138,7 +142,7 @@ To discover editable names:
 ```sh
 fchedit list skills
 fchedit list player-stats
-fchedit --character character.fch list inventory
+fchedit list inventory
 ```
 
 Inventory additions accept
@@ -151,11 +155,14 @@ Container example:
 
 ```sh
 docker run --rm -v "$PWD/testdata:/data" \
+  -e CHARACTER=/data/Steam_222222_bortson.fch \
   ghcr.io/lanchelms/fch-decoder-fchedit:latest \
-  --character /data/Steam_222222_bortson.fch set skill Run 50
+  set skill Run 50
 ```
 
 ## Prometheus Exporter
+
+### fchprom
 
 `fchprom` scans a Valheim `characters_local` directory and serves character metrics at `/metrics`.
 
