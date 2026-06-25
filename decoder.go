@@ -13,17 +13,6 @@ const (
 	fileOverhead   = fileLengthSize + trailerSize
 )
 
-type Character struct {
-	FileLength      uint32      `json:"fileLength"`
-	Version         uint32      `json:"version"`
-	PlayerStatCount uint32      `json:"playerStatCount"`
-	PlayerStats     []StatEntry `json:"playerStats,omitempty"`
-	Map             MapSection  `json:"map"`
-	Player          PlayerData  `json:"player"`
-	Trailer         Trailer     `json:"trailer"`
-	RemainingBytes  int         `json:"remainingBytes"`
-}
-
 type MapSection struct {
 	Offset           int    `json:"offset"`
 	CompressedLength uint32 `json:"compressedLength"`
