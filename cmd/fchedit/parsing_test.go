@@ -33,6 +33,24 @@ func TestParseInventoryItemDefaults(t *testing.T) {
 	}
 }
 
+func TestParseInventoryAction(t *testing.T) {
+	item, err := parseInventoryAction(addInventory, "Stone,stack=10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Name != "Stone" || item.Stack != 10 {
+		t.Fatalf("add item = %+v", item)
+	}
+
+	item, err = parseInventoryAction(removeInventory, " Wood ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Name != "Wood" {
+		t.Fatalf("remove item = %+v", item)
+	}
+}
+
 func TestParseAssignment(t *testing.T) {
 	assignment, err := parseAssignment(" Deaths = 5 ")
 	if err != nil {

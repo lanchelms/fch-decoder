@@ -33,6 +33,21 @@ func parseInventoryItem(value string) (fch.Item, error) {
 	return parser.parse()
 }
 
+func parseInventoryAction(action inventoryAction, value string) (fch.Item, error) {
+	switch action {
+	case addInventory:
+		return parseInventoryItem(value)
+	case removeInventory:
+		name := strings.TrimSpace(value)
+		if name == "" {
+			return fch.Item{}, fmt.Errorf("remove inventory item name is required")
+		}
+		return fch.Item{Name: name}, nil
+	default:
+		return fch.Item{}, fmt.Errorf("unknown inventory action %d", action)
+	}
+}
+
 func (p *inventoryItemParser) parse() (fch.Item, error) {
 	if err := p.parseName(); err != nil {
 		return fch.Item{}, err

@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	fch "github.com/lanchelms/fch-decoder"
 )
@@ -33,21 +32,38 @@ func (f opFlag) Set(value string) error {
 	return nil
 }
 
-type addInventoryOp struct {
-	item fch.Item
+type inventoryAction int
+
+const (
+	addInventory inventoryAction = iota
+	removeInventory
+)
+
+type inventoryOp struct {
+	action inventoryAction
+	item   fch.Item
 }
 
-func (op addInventoryOp) apply(c *fch.Character) error {
-	c.AddInventoryItem(op.item)
-	return nil
+func (op inventoryOp) apply(c *fch.Character) error {
+	switch op.action {
+	case addInventory:
+		c.AddInventoryItem(op.item)
+		return nil
+	case removeInventory:
+		return c.RemoveInventoryItem(op.item.Name)
+	default:
+		return fmt.Errorf("unknown inventory action %d", op.action)
+	}
 }
 
-type removeInventoryOp struct {
-	name string
-}
-
-func (op removeInventoryOp) apply(c *fch.Character) error {
-	return c.RemoveInventoryItem(op.name)
+func newInventoryOp(action inventoryAction) func(string) (editOp, error) {
+	return func(value string) (editOp, error) {
+		item, err := parseInventoryAction(action, value)
+		if err != nil {
+			return nil, err
+		}
+		return inventoryOp{action: action, item: item}, nil
+	}
 }
 
 type setSkillLevelOp struct {
@@ -99,8 +115,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	fs.StringVar(&outPath, "out", "", "path to write the edited character file")
 	fs.BoolVar(&inPlace, "in-place", false, "overwrite the input character file")
-	fs.Var(opFlag{ops: &ops, newOp: newAddInventoryOp}, "add-inventory", "add inventory item: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]")
-	fs.Var(opFlag{ops: &ops, newOp: newRemoveInventoryOp}, "remove-inventory", "remove first inventory item with exact name")
+	fs.Var(opFlag{ops: &ops, newOp: newInventoryOp(addInventory)}, "add-inventory", "add inventory item: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]")
+	fs.Var(opFlag{ops: &ops, newOp: newInventoryOp(removeInventory)}, "remove-inventory", "remove first inventory item with exact name")
 	fs.Var(opFlag{ops: &ops, newOp: newSetSkillLevelOp}, "set-skill-level", "set skill level: skill-name-or-type=level")
 	fs.Var(opFlag{ops: &ops, newOp: newSetStatOp((*fch.Character).UpsertEnemyStat)}, "set-enemy-stat", "set enemy stat: name=value")
 	fs.Var(opFlag{ops: &ops, newOp: newSetStatOp((*fch.Character).UpsertMaterialStat)}, "set-material-stat", "set material stat: name=value")
@@ -149,22 +165,6 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "wrote %s\n", target)
 	return nil
-}
-
-func newAddInventoryOp(value string) (editOp, error) {
-	item, err := parseInventoryItem(value)
-	if err != nil {
-		return nil, err
-	}
-	return addInventoryOp{item: item}, nil
-}
-
-func newRemoveInventoryOp(value string) (editOp, error) {
-	name := strings.TrimSpace(value)
-	if name == "" {
-		return nil, fmt.Errorf("remove inventory item name is required")
-	}
-	return removeInventoryOp{name: name}, nil
 }
 
 func newSetSkillLevelOp(value string) (editOp, error) {
