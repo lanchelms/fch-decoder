@@ -14,6 +14,16 @@ func TestCharacterEditMethods(t *testing.T) {
 		t.Fatalf("inventory = %+v", character.Player.Inventory)
 	}
 
+	if err := character.PutInventoryItem(Item{Name: "Resin", GridX: 0, GridY: 0}, false); err == nil {
+		t.Fatal("PutInventoryItem error = nil, want occupied slot")
+	}
+	if err := character.PutInventoryItem(Item{Name: "Resin", GridX: 0, GridY: 0}, true); err != nil {
+		t.Fatal(err)
+	}
+	if len(character.Player.Inventory) != 1 || character.Player.Inventory[0].Name != "Resin" {
+		t.Fatalf("inventory = %+v, want replaced item", character.Player.Inventory)
+	}
+
 	character.SetSkillLevel(102, "Run", 22)
 	character.SetSkillLevel(102, "Run", 23)
 	if len(character.Player.Skills) != 1 || character.Player.Skills[0].Level != 23 {

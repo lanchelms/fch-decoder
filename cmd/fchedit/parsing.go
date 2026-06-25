@@ -23,10 +23,15 @@ type playerStatRef struct {
 
 type inventoryItemParser struct {
 	parts []string
-	item  fch.Item
+	spec  inventoryItemSpec
 }
 
-func parseInventoryItem(value string) (fch.Item, error) {
+type inventoryItemSpec struct {
+	item    fch.Item
+	replace bool
+}
+
+func parseInventoryItem(value string) (inventoryItemSpec, error) {
 	parser := inventoryItemParser{parts: strings.Split(value, ",")}
 	return parser.parse()
 }
@@ -39,14 +44,14 @@ func parseInventoryName(value string) (string, error) {
 	return name, nil
 }
 
-func (p *inventoryItemParser) parse() (fch.Item, error) {
+func (p *inventoryItemParser) parse() (inventoryItemSpec, error) {
 	if err := p.parseName(); err != nil {
-		return fch.Item{}, err
+		return inventoryItemSpec{}, err
 	}
 	if err := p.parseFields(); err != nil {
-		return fch.Item{}, err
+		return inventoryItemSpec{}, err
 	}
-	return p.item, nil
+	return p.spec, nil
 }
 
 func (p *inventoryItemParser) parseName() error {
@@ -54,10 +59,10 @@ func (p *inventoryItemParser) parseName() error {
 	if name == "" {
 		return fmt.Errorf("inventory item name is required")
 	}
-	p.item = fch.Item{
+	p.spec.item = fch.Item{
 		Name:       name,
 		Stack:      1,
-		Durability: 1,
+		Durability: 100,
 		Quality:    1,
 		PickedUp:   true,
 	}
@@ -90,45 +95,47 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 	var err error
 	switch key {
 	case "stack":
-		p.item.Stack, err = parseInt32(raw)
-		if err == nil && p.item.Stack < 1 {
+		p.spec.item.Stack, err = parseInt32(raw)
+		if err == nil && p.spec.item.Stack < 1 {
 			return fmt.Errorf("must be at least 1")
 		}
 	case "durability":
-		p.item.Durability, err = parseFiniteFloat32(raw)
-		if err == nil && p.item.Durability < 0 {
+		p.spec.item.Durability, err = parseFiniteFloat32(raw)
+		if err == nil && p.spec.item.Durability < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
 	case "grid-x":
-		p.item.GridX, err = parseInt32(raw)
-		if err == nil && p.item.GridX < 0 {
+		p.spec.item.GridX, err = parseInt32(raw)
+		if err == nil && p.spec.item.GridX < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
 	case "grid-y":
-		p.item.GridY, err = parseInt32(raw)
-		if err == nil && p.item.GridY < 0 {
+		p.spec.item.GridY, err = parseInt32(raw)
+		if err == nil && p.spec.item.GridY < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
 	case "equipped":
-		p.item.Equipped, err = strconv.ParseBool(raw)
+		p.spec.item.Equipped, err = strconv.ParseBool(raw)
 	case "quality":
-		p.item.Quality, err = parseInt32(raw)
-		if err == nil && p.item.Quality < 1 {
+		p.spec.item.Quality, err = parseInt32(raw)
+		if err == nil && p.spec.item.Quality < 1 {
 			return fmt.Errorf("must be at least 1")
 		}
 	case "variant":
-		p.item.Variant, err = parseInt32(raw)
-		if err == nil && p.item.Variant < 0 {
+		p.spec.item.Variant, err = parseInt32(raw)
+		if err == nil && p.spec.item.Variant < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
 	case "crafter-id":
-		p.item.CrafterID, err = strconv.ParseUint(raw, 10, 64)
+		p.spec.item.CrafterID, err = strconv.ParseUint(raw, 10, 64)
 	case "crafter-name":
-		p.item.CrafterName = raw
+		p.spec.item.CrafterName = raw
 	case "world-level":
-		p.item.WorldLevel, err = parseUint32(raw)
+		p.spec.item.WorldLevel, err = parseUint32(raw)
 	case "picked-up":
-		p.item.PickedUp, err = strconv.ParseBool(raw)
+		p.spec.item.PickedUp, err = strconv.ParseBool(raw)
+	case "replace":
+		p.spec.replace, err = strconv.ParseBool(raw)
 	default:
 		return fmt.Errorf("unknown inventory item field %q", key)
 	}

@@ -21,6 +21,22 @@ func (c *Character) AddInventoryItem(item Item) {
 	c.Player.Inventory = append(c.Player.Inventory, item)
 }
 
+// PutInventoryItem adds item unless its grid slot is occupied. When replace is
+// true, the item at the same grid slot is overwritten.
+func (c *Character) PutInventoryItem(item Item, replace bool) error {
+	for i, existing := range c.Player.Inventory {
+		if existing.GridX == item.GridX && existing.GridY == item.GridY {
+			if !replace {
+				return fmt.Errorf("inventory slot %d,%d is occupied by %q", item.GridX, item.GridY, existing.Name)
+			}
+			c.Player.Inventory[i] = item
+			return nil
+		}
+	}
+	c.AddInventoryItem(item)
+	return nil
+}
+
 // RemoveInventoryItem removes the first inventory item with an exact name match.
 func (c *Character) RemoveInventoryItem(name string) error {
 	for i, item := range c.Player.Inventory {

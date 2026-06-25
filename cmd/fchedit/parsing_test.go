@@ -3,10 +3,11 @@ package main
 import "testing"
 
 func TestParseInventoryItem(t *testing.T) {
-	item, err := parseInventoryItem("Wood,stack=50,durability=0.75,grid-x=1,grid-y=2,equipped=true,quality=3,variant=4,crafter-id=123,crafter-name=Tester,world-level=2,picked-up=false")
+	spec, err := parseInventoryItem("Wood,stack=50,durability=0.75,grid-x=1,grid-y=2,equipped=true,quality=3,variant=4,crafter-id=123,crafter-name=Tester,world-level=2,picked-up=false,replace=true")
 	if err != nil {
 		t.Fatal(err)
 	}
+	item := spec.item
 	if item.Name != "Wood" ||
 		item.Stack != 50 ||
 		item.Durability != 0.75 ||
@@ -18,18 +19,20 @@ func TestParseInventoryItem(t *testing.T) {
 		item.CrafterID != 123 ||
 		item.CrafterName != "Tester" ||
 		item.WorldLevel != 2 ||
-		item.PickedUp {
-		t.Fatalf("item = %+v", item)
+		item.PickedUp ||
+		!spec.replace {
+		t.Fatalf("spec = %+v", spec)
 	}
 }
 
 func TestParseInventoryItemDefaults(t *testing.T) {
-	item, err := parseInventoryItem("Stone")
+	spec, err := parseInventoryItem("Stone")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item.Name != "Stone" || item.Stack != 1 || item.Durability != 1 || item.Quality != 1 || !item.PickedUp {
-		t.Fatalf("item = %+v, want defaults", item)
+	item := spec.item
+	if item.Name != "Stone" || item.Stack != 1 || item.Durability != 100 || item.Quality != 1 || !item.PickedUp || spec.replace {
+		t.Fatalf("spec = %+v, want defaults", spec)
 	}
 }
 

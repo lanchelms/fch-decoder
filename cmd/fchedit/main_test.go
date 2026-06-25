@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ func TestRunAppliesEditCommands(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	commands := [][]string{
 		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=50,grid-x=1,grid-y=2,quality=3,crafter-name=Tester"},
-		{"--character", out, "add", "inventory", "Stone,stack=25"},
+		{"--character", out, "add", "inventory", "Stone,stack=25,grid-x=2,grid-y=2"},
 		{"--character", out, "remove", "inventory", "Wood"},
 		{"--character", out, "set", "skill", "Swords", "44.5"},
 		{"--character", out, "set", "skill", "Run", "22"},
@@ -48,7 +49,7 @@ func TestRunAppliesEditCommands(t *testing.T) {
 	if stone == nil {
 		t.Fatal("Stone inventory item was not added")
 	}
-	if stone.Stack != 25 || stone.Durability != 1 || stone.Quality != 1 || !stone.PickedUp {
+	if stone.Stack != 25 || stone.Durability != 100 || stone.Quality != 1 || stone.GridX != 2 || stone.GridY != 2 || !stone.PickedUp {
 		t.Fatalf("Stone item = %+v, want stack 25 with defaults", *stone)
 	}
 	if got := skillLevel(got.Player.Skills, 1); got != 44.5 {
@@ -139,9 +140,9 @@ func TestRunChainsSingleEditCommands(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
 	commands := [][]string{
-		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=1"},
+		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=1,grid-x=2,grid-y=2"},
 		{"--character", out, "remove", "inventory", "Wood"},
-		{"--character", out, "add", "inventory", "Wood,stack=2"},
+		{"--character", out, "add", "inventory", "Wood,stack=2,grid-x=2,grid-y=2"},
 	}
 	for _, args := range commands {
 		if err := run(args, ioDiscard{}, ioDiscard{}); err != nil {
@@ -175,6 +176,37 @@ func TestRunRejectsUnknownRemove(t *testing.T) {
 	err := run([]string{"--character", in, "--out", out, "remove", "inventory", "DefinitelyMissing"}, ioDiscard{}, ioDiscard{})
 	if err == nil || err.Error() != `inventory item "DefinitelyMissing" not found` {
 		t.Fatalf("run error = %v, want missing inventory item", err)
+	}
+}
+
+func TestRunRejectsOccupiedInventorySlot(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	occupied := decodeFile(t, in).Player.Inventory[0]
+	spec := fmt.Sprintf("Stone,grid-x=%d,grid-y=%d", occupied.GridX, occupied.GridY)
+
+	err := run([]string{"--character", in, "add", "inventory", spec}, ioDiscard{}, ioDiscard{})
+	if err == nil || !strings.Contains(err.Error(), "inventory slot") || !strings.Contains(err.Error(), "occupied") {
+		t.Fatalf("run error = %v, want occupied inventory slot", err)
+	}
+}
+
+func TestRunReplacesOccupiedInventorySlot(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	before := decodeFile(t, in)
+	occupied := before.Player.Inventory[0]
+	spec := fmt.Sprintf("Stone,stack=25,grid-x=%d,grid-y=%d,replace=true", occupied.GridX, occupied.GridY)
+
+	if err := run([]string{"--character", in, "add", "inventory", spec}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+
+	after := decodeFile(t, in)
+	if len(after.Player.Inventory) != len(before.Player.Inventory) {
+		t.Fatalf("Inventory = %d, want %d", len(after.Player.Inventory), len(before.Player.Inventory))
+	}
+	item := findSlot(after.Player.Inventory, occupied.GridX, occupied.GridY)
+	if item == nil || item.Name != "Stone" || item.Stack != 25 || item.Durability != 100 {
+		t.Fatalf("replaced item = %+v, want Stone stack 25 at occupied slot", item)
 	}
 }
 
@@ -334,6 +366,15 @@ func decodeFile(t *testing.T, path string) *fch.Character {
 func findItem(items []fch.Item, name string) *fch.Item {
 	for i := range items {
 		if items[i].Name == name {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
+func findSlot(items []fch.Item, gridX int32, gridY int32) *fch.Item {
+	for i := range items {
+		if items[i].GridX == gridX && items[i].GridY == gridY {
 			return &items[i]
 		}
 	}
