@@ -25,6 +25,15 @@ jobs:
           - cmd: fchdump
             goos: windows
             goarch: amd64
+          - cmd: fchedit
+            goos: linux
+            goarch: amd64
+          - cmd: fchedit
+            goos: linux
+            goarch: arm64
+          - cmd: fchedit
+            goos: windows
+            goarch: amd64
           - cmd: fchprom
             goos: linux
             goarch: amd64
@@ -82,6 +91,7 @@ jobs:
       matrix:
         include:
           - cmd: fchdump
+          - cmd: fchedit
           - cmd: fchprom
     steps:
       - uses: actions/checkout@v6

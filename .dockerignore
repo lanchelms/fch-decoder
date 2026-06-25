@@ -7,6 +7,10 @@
 !cmd/fchdump/
 !cmd/fchdump/Dockerfile
 !cmd/fchdump/main.go
+!cmd/fchedit/
+!cmd/fchedit/Dockerfile
+!cmd/fchedit/main.go
+!cmd/fchedit/parsing.go
 !cmd/fchprom/
 !cmd/fchprom/Dockerfile
 !cmd/fchprom/main.go
