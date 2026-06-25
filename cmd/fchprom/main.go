@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alecthomas/kong"
 	fch "github.com/lanchelms/fch-decoder"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -190,32 +191,84 @@ type sample struct {
 	labels []string
 }
 
-func main() {
-	addr := flag.String("addr", ":9108", "address to serve Prometheus metrics on")
-	dir := flag.String("dir", "", "Valheim characters_local directory")
-	metricsPath := flag.String("metrics-path", "/metrics", "Prometheus metrics path")
-	workers := flag.Int("workers", runtime.NumCPU(), "maximum number of character files to decode in parallel")
-	cacheTTL := flag.Duration("cache-ttl", defaultCacheTTL, "how long to reuse decoded metrics between scrapes")
-	flag.Parse()
-	if *dir == "" {
-		log.Fatal("missing required -dir flag")
-	}
+type cli struct {
+	Addr        string        `name:"addr" help:"Address to serve Prometheus metrics on."`
+	Dir         string        `name:"dir" required:"" type:"path" help:"Valheim characters_local directory."`
+	MetricsPath string        `name:"metrics-path" help:"Prometheus metrics path."`
+	Workers     int           `name:"workers" help:"Maximum number of character files to decode in parallel."`
+	CacheTTL    time.Duration `name:"cache-ttl" help:"How long to reuse decoded metrics between scrapes."`
+}
 
+func main() {
+	cli, err := parseCLI(os.Args[1:], os.Stdout, os.Stderr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	serve(cli)
+}
+
+func serve(cli cli) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(&collector{
-		dir:      *dir,
-		workers:  *workers,
-		cacheTTL: *cacheTTL,
+		dir:      cli.Dir,
+		workers:  cli.Workers,
+		cacheTTL: cli.CacheTTL,
 	})
 
 	mux := http.NewServeMux()
-	mux.Handle(*metricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.Handle(cli.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Valheim character metrics at %s\n", *metricsPath)
+		fmt.Fprintf(w, "Valheim character metrics at %s\n", cli.MetricsPath)
 	})
 
-	log.Printf("serving Valheim character metrics on %s from %s", *addr, *dir)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	log.Printf("serving Valheim character metrics on %s from %s", cli.Addr, cli.Dir)
+	log.Fatal(http.ListenAndServe(cli.Addr, mux))
+}
+
+func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
+	cli := cli{
+		Addr:        ":9108",
+		MetricsPath: "/metrics",
+		Workers:     runtime.NumCPU(),
+		CacheTTL:    defaultCacheTTL,
+	}
+	parser, err := kong.New(&cli, kong.Name("fchprom"), kong.Writers(stdout, stderr))
+	if err != nil {
+		return cli, err
+	}
+	if _, err := parser.Parse(normalizeFlags(args, legacyFlags)); err != nil {
+		return cli, err
+	}
+	return cli, nil
+}
+
+var legacyFlags = map[string]bool{
+	"addr":         true,
+	"dir":          true,
+	"metrics-path": true,
+	"workers":      true,
+	"cache-ttl":    true,
+}
+
+func normalizeFlags(args []string, names map[string]bool) []string {
+	normalized := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--") || !strings.HasPrefix(arg, "-") || arg == "-" {
+			normalized = append(normalized, arg)
+			continue
+		}
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
+		if !names[name] {
+			normalized = append(normalized, arg)
+			continue
+		}
+		if hasValue {
+			normalized = append(normalized, "--"+name+"="+value)
+		} else {
+			normalized = append(normalized, "--"+name)
+		}
+	}
+	return normalized
 }
 
 func loadSnapshot(dir string, workers int) snapshot {

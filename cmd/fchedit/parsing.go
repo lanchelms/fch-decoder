@@ -8,11 +8,6 @@ import (
 	fch "github.com/lanchelms/fch-decoder"
 )
 
-type assignment struct {
-	name  string
-	value float32
-}
-
 type skillRef struct {
 	skillType int32
 	name      string
@@ -124,22 +119,6 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 		return fmt.Errorf("unknown inventory item field %q", key)
 	}
 	return err
-}
-
-func parseAssignment(value string) (assignment, error) {
-	name, raw, ok := strings.Cut(value, "=")
-	if !ok {
-		return assignment{}, fmt.Errorf("expected name=value, got %q", value)
-	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return assignment{}, fmt.Errorf("assignment name is required")
-	}
-	amount, err := parseFloat32(strings.TrimSpace(raw))
-	if err != nil {
-		return assignment{}, err
-	}
-	return assignment{name: name, value: amount}, nil
 }
 
 func parseSkillRef(value string) (skillRef, error) {

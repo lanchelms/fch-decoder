@@ -1,12 +1,13 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/alecthomas/kong"
 	fch "github.com/lanchelms/fch-decoder"
 )
 
@@ -14,22 +15,104 @@ type editOp interface {
 	apply(*fch.Character) error
 }
 
-type opFlag struct {
-	ops   *[]editOp
-	newOp func(string) (editOp, error)
+const characterEnv = "CHARACTER"
+
+type cli struct {
+	Out    string    `name:"out" type:"path" help:"Write the edited character to this path instead of updating the input file."`
+	Add    addCmd    `cmd:"" help:"Add character data."`
+	Remove removeCmd `cmd:"" help:"Remove character data."`
+	Set    setCmd    `cmd:"" help:"Set character data."`
 }
 
-func (f opFlag) String() string {
-	return ""
+type addCmd struct {
+	Inventory addInventoryCmd `cmd:"" help:"Add an inventory item."`
 }
 
-func (f opFlag) Set(value string) error {
-	op, err := f.newOp(value)
+type addInventoryCmd struct {
+	Item string `arg:"" name:"item" help:"Item spec: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]."`
+}
+
+func (cmd *addInventoryCmd) Run(r *editRunner) error {
+	item, err := parseInventoryAction(addInventory, cmd.Item)
 	if err != nil {
 		return err
 	}
-	*f.ops = append(*f.ops, op)
-	return nil
+	return r.apply(inventoryOp{action: addInventory, item: item})
+}
+
+type removeCmd struct {
+	Inventory removeInventoryCmd `cmd:"" help:"Remove an inventory item."`
+}
+
+type removeInventoryCmd struct {
+	Name string `arg:"" name:"name" help:"Inventory item name to remove."`
+}
+
+func (cmd *removeInventoryCmd) Run(r *editRunner) error {
+	item, err := parseInventoryAction(removeInventory, cmd.Name)
+	if err != nil {
+		return err
+	}
+	return r.apply(inventoryOp{action: removeInventory, item: item})
+}
+
+type setCmd struct {
+	Skill      setSkillCmd      `cmd:"" help:"Set a skill level."`
+	Enemy      setEnemyCmd      `cmd:"" help:"Set an enemy stat."`
+	Material   setMaterialCmd   `cmd:"" help:"Set a material stat."`
+	PlayerStat setPlayerStatCmd `cmd:"" name:"player-stat" help:"Set a player stat."`
+}
+
+type setSkillCmd struct {
+	Skill string  `arg:"" name:"skill" help:"Skill name or numeric type."`
+	Level float32 `arg:"" name:"level" help:"Skill level."`
+}
+
+func (cmd *setSkillCmd) Run(r *editRunner) error {
+	op, err := newSetSkillLevelOp(cmd.Skill, cmd.Level)
+	if err != nil {
+		return err
+	}
+	return r.apply(op)
+}
+
+type setEnemyCmd struct {
+	Name  string  `arg:"" name:"name" help:"Enemy stat name."`
+	Value float32 `arg:"" name:"value" help:"Enemy stat value."`
+}
+
+func (cmd *setEnemyCmd) Run(r *editRunner) error {
+	return r.apply(setStatOp{
+		name:  cmd.Name,
+		value: cmd.Value,
+		set:   (*fch.Character).UpsertEnemyStat,
+	})
+}
+
+type setMaterialCmd struct {
+	Name  string  `arg:"" name:"name" help:"Material stat name."`
+	Value float32 `arg:"" name:"value" help:"Material stat value."`
+}
+
+func (cmd *setMaterialCmd) Run(r *editRunner) error {
+	return r.apply(setStatOp{
+		name:  cmd.Name,
+		value: cmd.Value,
+		set:   (*fch.Character).UpsertMaterialStat,
+	})
+}
+
+type setPlayerStatCmd struct {
+	Stat  string  `arg:"" name:"stat" help:"Player stat name or numeric index."`
+	Value float32 `arg:"" name:"value" help:"Player stat value."`
+}
+
+func (cmd *setPlayerStatCmd) Run(r *editRunner) error {
+	op, err := newSetPlayerStatOp(cmd.Stat, cmd.Value)
+	if err != nil {
+		return err
+	}
+	return r.apply(op)
 }
 
 type inventoryAction int
@@ -53,16 +136,6 @@ func (op inventoryOp) apply(c *fch.Character) error {
 		return c.RemoveInventoryItem(op.item.Name)
 	default:
 		return fmt.Errorf("unknown inventory action %d", op.action)
-	}
-}
-
-func newInventoryOp(action inventoryAction) func(string) (editOp, error) {
-	return func(value string) (editOp, error) {
-		item, err := parseInventoryAction(action, value)
-		if err != nil {
-			return nil, err
-		}
-		return inventoryOp{action: action, item: item}, nil
 	}
 }
 
@@ -90,13 +163,20 @@ func (op setPlayerStatOp) apply(c *fch.Character) error {
 type statSetter func(*fch.Character, string, float32)
 
 type setStatOp struct {
-	assignment assignment
-	set        statSetter
+	name  string
+	value float32
+	set   statSetter
 }
 
 func (op setStatOp) apply(c *fch.Character) error {
-	op.set(c, op.assignment.name, op.assignment.value)
+	op.set(c, op.name, op.value)
 	return nil
+}
+
+type editRunner struct {
+	path   string
+	out    string
+	stdout io.Writer
 }
 
 func main() {
@@ -107,38 +187,89 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) error {
-	var ops []editOp
-	var outPath string
-	var inPlace bool
-
-	fs := flag.NewFlagSet("fchedit", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.StringVar(&outPath, "out", "", "path to write the edited character file")
-	fs.BoolVar(&inPlace, "in-place", false, "overwrite the input character file")
-	fs.Var(opFlag{ops: &ops, newOp: newInventoryOp(addInventory)}, "add-inventory", "add inventory item: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]")
-	fs.Var(opFlag{ops: &ops, newOp: newInventoryOp(removeInventory)}, "remove-inventory", "remove first inventory item with exact name")
-	fs.Var(opFlag{ops: &ops, newOp: newSetSkillLevelOp}, "set-skill-level", "set skill level: skill-name-or-type=level")
-	fs.Var(opFlag{ops: &ops, newOp: newSetStatOp((*fch.Character).UpsertEnemyStat)}, "set-enemy-stat", "set enemy stat: name=value")
-	fs.Var(opFlag{ops: &ops, newOp: newSetStatOp((*fch.Character).UpsertMaterialStat)}, "set-material-stat", "set material stat: name=value")
-	fs.Var(opFlag{ops: &ops, newOp: newSetPlayerStatOp}, "set-player-stat", "set player stat: stat-name-or-index=value")
-	if err := fs.Parse(args); err != nil {
+	character, cli, ctx, err := parseCLI(args, stdout, stderr)
+	if err != nil {
 		return err
 	}
-	if fs.NArg() != 1 {
-		return fmt.Errorf("usage: fchedit [flags] <character.fch>")
-	}
-	if len(ops) == 0 {
-		return fmt.Errorf("no edits requested")
-	}
-	if inPlace && outPath != "" {
-		return fmt.Errorf("-in-place and -out cannot be used together")
-	}
-	if !inPlace && outPath == "" {
-		return fmt.Errorf("missing required -out flag; use -in-place to overwrite the input file")
+	runner := &editRunner{path: character, out: cli.Out, stdout: stdout}
+	return ctx.Run(runner)
+}
+
+func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (string, cli, *kong.Context, error) {
+	character, commandArgs, err := splitCharacter(args)
+	if err != nil {
+		return "", cli{}, nil, err
 	}
 
-	inputPath := fs.Arg(0)
-	data, err := os.ReadFile(inputPath)
+	var cli cli
+	parser, err := kong.New(&cli, kong.Name("fchedit"), kong.Writers(stdout, stderr))
+	if err != nil {
+		return "", cli, nil, err
+	}
+	ctx, err := parser.Parse(commandArgs)
+	if err != nil {
+		return "", cli, nil, err
+	}
+	return character, cli, ctx, nil
+}
+
+func splitCharacter(args []string) (string, []string, error) {
+	if character, ok := envCharacter(args); ok {
+		return character, args, nil
+	}
+	if len(args) == 0 {
+		return "", nil, fmt.Errorf("missing character file; pass it first or set %s", characterEnv)
+	}
+	if args[0] == "--help" || args[0] == "-h" {
+		return "", args, nil
+	}
+	if strings.HasPrefix(args[0], "-") {
+		return "", nil, fmt.Errorf("character file must be the first argument or %s must be set", characterEnv)
+	}
+	if isCommand(args[0]) {
+		return "", nil, fmt.Errorf("missing character file; pass it first or set %s", characterEnv)
+	}
+	return args[0], args[1:], nil
+}
+
+func envCharacter(args []string) (string, bool) {
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") && !isCommand(args[0]) {
+		return "", false
+	}
+	character, ok := os.LookupEnv(characterEnv)
+	if !ok || character == "" {
+		return "", false
+	}
+	return character, true
+}
+
+func isCommand(value string) bool {
+	switch value {
+	case "add", "remove", "set":
+		return true
+	default:
+		return false
+	}
+}
+
+func newSetSkillLevelOp(name string, level float32) (editOp, error) {
+	skill, err := parseSkillRef(name)
+	if err != nil {
+		return nil, err
+	}
+	return setSkillLevelOp{skillType: skill.skillType, name: skill.name, level: level}, nil
+}
+
+func newSetPlayerStatOp(name string, value float32) (editOp, error) {
+	stat, err := parsePlayerStatRef(name)
+	if err != nil {
+		return nil, err
+	}
+	return setPlayerStatOp{index: stat.index, name: stat.name, value: value}, nil
+}
+
+func (r *editRunner) apply(op editOp) error {
+	data, err := os.ReadFile(r.path)
 	if err != nil {
 		return err
 	}
@@ -146,59 +277,23 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	for _, op := range ops {
-		if err := op.apply(character); err != nil {
-			return err
-		}
+	if err := op.apply(character); err != nil {
+		return err
 	}
 	encoded, err := fch.EncodeBytes(character)
 	if err != nil {
 		return err
 	}
 
-	target := outPath
-	if inPlace {
-		target = inputPath
+	target := r.out
+	if target == "" {
+		target = r.path
 	}
-	if err := writeFile(target, encoded, inputPath); err != nil {
+	if err := writeFile(target, encoded, r.path); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "wrote %s\n", target)
+	fmt.Fprintf(r.stdout, "wrote %s\n", target)
 	return nil
-}
-
-func newSetSkillLevelOp(value string) (editOp, error) {
-	assignment, err := parseAssignment(value)
-	if err != nil {
-		return nil, err
-	}
-	skill, err := parseSkillRef(assignment.name)
-	if err != nil {
-		return nil, err
-	}
-	return setSkillLevelOp{skillType: skill.skillType, name: skill.name, level: assignment.value}, nil
-}
-
-func newSetPlayerStatOp(value string) (editOp, error) {
-	assignment, err := parseAssignment(value)
-	if err != nil {
-		return nil, err
-	}
-	stat, err := parsePlayerStatRef(assignment.name)
-	if err != nil {
-		return nil, err
-	}
-	return setPlayerStatOp{index: stat.index, name: stat.name, value: assignment.value}, nil
-}
-
-func newSetStatOp(set statSetter) func(string) (editOp, error) {
-	return func(value string) (editOp, error) {
-		assignment, err := parseAssignment(value)
-		if err != nil {
-			return nil, err
-		}
-		return setStatOp{assignment: assignment, set: set}, nil
-	}
 }
 
 func writeFile(path string, data []byte, modeFrom string) error {

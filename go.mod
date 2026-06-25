@@ -3,6 +3,7 @@ module github.com/lanchelms/fch-decoder
 go 1.26
 
 require (
+	github.com/alecthomas/kong v1.15.0
 	github.com/prometheus/client_golang v1.23.2
 	golang.org/x/text v0.38.0
 )

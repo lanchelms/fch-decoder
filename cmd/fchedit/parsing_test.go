@@ -51,16 +51,6 @@ func TestParseInventoryAction(t *testing.T) {
 	}
 }
 
-func TestParseAssignment(t *testing.T) {
-	assignment, err := parseAssignment(" Deaths = 5 ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if assignment.name != "Deaths" || assignment.value != 5 {
-		t.Fatalf("assignment = %+v", assignment)
-	}
-}
-
 func TestParseSkillRef(t *testing.T) {
 	skill, err := parseSkillRef("Run")
 	if err != nil {

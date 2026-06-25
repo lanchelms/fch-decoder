@@ -10,28 +10,28 @@ import (
 	fch "github.com/lanchelms/fch-decoder"
 )
 
-func TestRunAppliesRepeatedEditFlags(t *testing.T) {
+func TestRunAppliesEditCommands(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
 	var stdout, stderr bytes.Buffer
-	err := run([]string{
-		"-out", out,
-		"-add-inventory", "Wood,stack=50,grid-x=1,grid-y=2,quality=3,crafter-name=Tester",
-		"-add-inventory", "Stone,stack=25",
-		"-remove-inventory", "Wood",
-		"-set-skill-level", "Swords=44.5",
-		"-set-skill-level", "Run=22",
-		"-set-enemy-stat", "$enemy_greydwarf=123",
-		"-set-enemy-stat", "$enemy_troll=9",
-		"-set-material-stat", "$item_wood=777",
-		"-set-material-stat", "$item_stone=12",
-		"-set-player-stat", "Deaths=5",
-		"-set-player-stat", "Builds=6",
-		in,
-	}, &stdout, &stderr)
-	if err != nil {
-		t.Fatalf("run error = %v, stderr = %s", err, stderr.String())
+	commands := [][]string{
+		{in, "--out", out, "add", "inventory", "Wood,stack=50,grid-x=1,grid-y=2,quality=3,crafter-name=Tester"},
+		{out, "add", "inventory", "Stone,stack=25"},
+		{out, "remove", "inventory", "Wood"},
+		{out, "set", "skill", "Swords", "44.5"},
+		{out, "set", "skill", "Run", "22"},
+		{out, "set", "enemy", "$enemy_greydwarf", "123"},
+		{out, "set", "enemy", "$enemy_troll", "9"},
+		{out, "set", "material", "$item_wood", "777"},
+		{out, "set", "material", "$item_stone", "12"},
+		{out, "set", "player-stat", "Deaths", "5"},
+		{out, "set", "player-stat", "Builds", "6"},
+	}
+	for _, args := range commands {
+		if err := run(args, &stdout, &stderr); err != nil {
+			t.Fatalf("run(%v) error = %v, stderr = %s", args, err, stderr.String())
+		}
 	}
 	if !strings.Contains(stdout.String(), "wrote "+out) {
 		t.Fatalf("stdout = %q, want wrote message", stdout.String())
@@ -80,7 +80,7 @@ func TestRunAppliesRepeatedEditFlags(t *testing.T) {
 func TestRunInPlace(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
-	err := run([]string{"-in-place", "-set-player-stat", "Deaths=99", in}, ioDiscard{}, ioDiscard{})
+	err := run([]string{in, "set", "player-stat", "Deaths", "99"}, ioDiscard{}, ioDiscard{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,12 +94,70 @@ func TestRunInPlace(t *testing.T) {
 	}
 }
 
-func TestRunRequiresExplicitOutput(t *testing.T) {
+func TestRunUsesCharacterEnv(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	t.Setenv(characterEnv, in)
+
+	if err := run([]string{"set", "player-stat", "Deaths", "77"}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+
+	got := decodeFile(t, in)
+	if got.PlayerStats[0].Value != 77 {
+		t.Fatalf("Deaths player stat = %v, want 77", got.PlayerStats[0].Value)
+	}
+}
+
+func TestRunPrefersExplicitCharacter(t *testing.T) {
+	envPath := copyFixture(t, "Steam_333333_tugen.fch")
+	explicitPath := copyFixture(t, "Steam_333333_tugen.fch")
+	t.Setenv(characterEnv, envPath)
+
+	if err := run([]string{explicitPath, "set", "player-stat", "Deaths", "88"}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+
+	envCharacter := decodeFile(t, envPath)
+	if envCharacter.PlayerStats[0].Value == 88 {
+		t.Fatal("environment character was edited despite explicit character argument")
+	}
+	explicitCharacter := decodeFile(t, explicitPath)
+	if explicitCharacter.PlayerStats[0].Value != 88 {
+		t.Fatalf("explicit character Deaths = %v, want 88", explicitCharacter.PlayerStats[0].Value)
+	}
+}
+
+func TestRunChainsSingleEditCommands(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	out := filepath.Join(t.TempDir(), "edited.fch")
+
+	commands := [][]string{
+		{in, "--out", out, "add", "inventory", "Wood,stack=1"},
+		{out, "remove", "inventory", "Wood"},
+		{out, "add", "inventory", "Wood,stack=2"},
+	}
+	for _, args := range commands {
+		if err := run(args, ioDiscard{}, ioDiscard{}); err != nil {
+			t.Fatalf("run(%v) error = %v", args, err)
+		}
+	}
+
+	got := decodeFile(t, out)
+	wood := findItem(got.Player.Inventory, "Wood")
+	if wood == nil || wood.Stack != 2 {
+		t.Fatalf("Wood item = %+v, want final add to remain", wood)
+	}
+}
+
+func TestRunWritesInPlaceByDefault(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
-	err := run([]string{"-set-player-stat", "Deaths=1", in}, ioDiscard{}, ioDiscard{})
-	if err == nil || err.Error() != "missing required -out flag; use -in-place to overwrite the input file" {
-		t.Fatalf("run error = %v, want missing output", err)
+	if err := run([]string{in, "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	got := decodeFile(t, in)
+	if got.PlayerStats[0].Value != 1 {
+		t.Fatalf("Deaths player stat = %v, want 1", got.PlayerStats[0].Value)
 	}
 }
 
@@ -107,7 +165,7 @@ func TestRunRejectsUnknownRemove(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
-	err := run([]string{"-out", out, "-remove-inventory", "DefinitelyMissing", in}, ioDiscard{}, ioDiscard{})
+	err := run([]string{in, "--out", out, "remove", "inventory", "DefinitelyMissing"}, ioDiscard{}, ioDiscard{})
 	if err == nil || err.Error() != `inventory item "DefinitelyMissing" not found` {
 		t.Fatalf("run error = %v, want missing inventory item", err)
 	}
@@ -117,7 +175,7 @@ func TestRunRejectsUnknownSkill(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
-	err := run([]string{"-out", out, "-set-skill-level", "Nope=1", in}, ioDiscard{}, ioDiscard{})
+	err := run([]string{in, "--out", out, "set", "skill", "Nope", "1"}, ioDiscard{}, ioDiscard{})
 	if err == nil || !strings.Contains(err.Error(), `unknown skill "Nope"`) {
 		t.Fatalf("run error = %v, want unknown skill", err)
 	}
