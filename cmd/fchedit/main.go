@@ -17,7 +17,7 @@ type editOp interface {
 
 type opFlag struct {
 	ops   *[]editOp
-	parse func(string) (editOp, error)
+	newOp func(string) (editOp, error)
 }
 
 func (f opFlag) String() string {
@@ -25,7 +25,7 @@ func (f opFlag) String() string {
 }
 
 func (f opFlag) Set(value string) error {
-	op, err := f.parse(value)
+	op, err := f.newOp(value)
 	if err != nil {
 		return err
 	}
@@ -99,12 +99,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	fs.StringVar(&outPath, "out", "", "path to write the edited character file")
 	fs.BoolVar(&inPlace, "in-place", false, "overwrite the input character file")
-	fs.Var(opFlag{ops: &ops, parse: parseAddInventory}, "add-inventory", "add inventory item: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]")
-	fs.Var(opFlag{ops: &ops, parse: parseRemoveInventory}, "remove-inventory", "remove first inventory item with exact name")
-	fs.Var(opFlag{ops: &ops, parse: parseSetSkillLevel}, "set-skill-level", "set skill level: skill-name-or-type=level")
-	fs.Var(opFlag{ops: &ops, parse: parseSetStat((*fch.Character).UpsertEnemyStat)}, "set-enemy-stat", "set enemy stat: name=value")
-	fs.Var(opFlag{ops: &ops, parse: parseSetStat((*fch.Character).UpsertMaterialStat)}, "set-material-stat", "set material stat: name=value")
-	fs.Var(opFlag{ops: &ops, parse: parseSetPlayerStat}, "set-player-stat", "set player stat: stat-name-or-index=value")
+	fs.Var(opFlag{ops: &ops, newOp: newAddInventoryOp}, "add-inventory", "add inventory item: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]")
+	fs.Var(opFlag{ops: &ops, newOp: newRemoveInventoryOp}, "remove-inventory", "remove first inventory item with exact name")
+	fs.Var(opFlag{ops: &ops, newOp: newSetSkillLevelOp}, "set-skill-level", "set skill level: skill-name-or-type=level")
+	fs.Var(opFlag{ops: &ops, newOp: newSetStatOp((*fch.Character).UpsertEnemyStat)}, "set-enemy-stat", "set enemy stat: name=value")
+	fs.Var(opFlag{ops: &ops, newOp: newSetStatOp((*fch.Character).UpsertMaterialStat)}, "set-material-stat", "set material stat: name=value")
+	fs.Var(opFlag{ops: &ops, newOp: newSetPlayerStatOp}, "set-player-stat", "set player stat: stat-name-or-index=value")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	return nil
 }
 
-func parseAddInventory(value string) (editOp, error) {
+func newAddInventoryOp(value string) (editOp, error) {
 	item, err := parseInventoryItem(value)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func parseAddInventory(value string) (editOp, error) {
 	return addInventoryOp{item: item}, nil
 }
 
-func parseRemoveInventory(value string) (editOp, error) {
+func newRemoveInventoryOp(value string) (editOp, error) {
 	name := strings.TrimSpace(value)
 	if name == "" {
 		return nil, fmt.Errorf("remove inventory item name is required")
@@ -167,7 +167,7 @@ func parseRemoveInventory(value string) (editOp, error) {
 	return removeInventoryOp{name: name}, nil
 }
 
-func parseSetSkillLevel(value string) (editOp, error) {
+func newSetSkillLevelOp(value string) (editOp, error) {
 	assignment, err := parseAssignment(value)
 	if err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func parseSetSkillLevel(value string) (editOp, error) {
 	return setSkillLevelOp{skillType: skill.skillType, name: skill.name, level: assignment.value}, nil
 }
 
-func parseSetPlayerStat(value string) (editOp, error) {
+func newSetPlayerStatOp(value string) (editOp, error) {
 	assignment, err := parseAssignment(value)
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func parseSetPlayerStat(value string) (editOp, error) {
 	return setPlayerStatOp{index: stat.index, name: stat.name, value: assignment.value}, nil
 }
 
-func parseSetStat(set statSetter) func(string) (editOp, error) {
+func newSetStatOp(set statSetter) func(string) (editOp, error) {
 	return func(value string) (editOp, error) {
 		assignment, err := parseAssignment(value)
 		if err != nil {
