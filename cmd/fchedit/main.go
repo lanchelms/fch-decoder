@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/alecthomas/kong"
 	fch "github.com/lanchelms/fch-decoder"
@@ -165,10 +166,11 @@ func (cmd *listSkillsCmd) Run(r *editRunner) error {
 type listPlayerStatCmd struct{}
 
 func (cmd *listPlayerStatCmd) Run(r *editRunner) error {
+	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
 	for i, name := range fch.PlayerStatNames() {
-		fmt.Fprintf(r.stdout, "%d\t%s\n", i, name)
+		fmt.Fprintf(w, "%d\t%s\n", i, name)
 	}
-	return nil
+	return w.Flush()
 }
 
 type listInventoryCmd struct{}
@@ -178,17 +180,7 @@ func (cmd *listInventoryCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	for _, item := range character.Player.Inventory {
-		fmt.Fprintf(r.stdout, "%s\tstack=%d\tquality=%d\tdurability=%v\tgrid=%d,%d\n",
-			item.Name,
-			item.Stack,
-			item.Quality,
-			item.Durability,
-			item.GridX,
-			item.GridY,
-		)
-	}
-	return nil
+	return r.listInventory(character)
 }
 
 type editRunner struct {
@@ -197,6 +189,21 @@ type editRunner struct {
 	dryRun   bool
 	noBackup bool
 	stdout   io.Writer
+}
+
+func (r *editRunner) listInventory(character *fch.Character) error {
+	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
+	for _, item := range character.Player.Inventory {
+		fmt.Fprintf(w, "%s\tstack=%d\tquality=%d\tdurability=%v\tgrid=%d,%d\n",
+			item.Name,
+			item.Stack,
+			item.Quality,
+			item.Durability,
+			item.GridX,
+			item.GridY,
+		)
+	}
+	return w.Flush()
 }
 
 func (r *editRunner) readCharacter() (*fch.Character, error) {

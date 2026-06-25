@@ -234,7 +234,7 @@ func TestRunListsWithoutCharacter(t *testing.T) {
 	if err := run([]string{"list", "player-stats"}, &stdout, ioDiscard{}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "0\tDeaths") {
+	if !strings.Contains(stdout.String(), "0    Deaths") {
 		t.Fatalf("stdout = %q, want player stats", stdout.String())
 	}
 
@@ -256,6 +256,34 @@ func TestRunListsInventory(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "stack=") {
 		t.Fatalf("stdout = %q, want inventory", stdout.String())
+	}
+}
+
+func TestListInventoryAlignsColumns(t *testing.T) {
+	runner := &editRunner{stdout: &bytes.Buffer{}}
+	character := &fch.Character{
+		Player: fch.PlayerData{
+			Inventory: []fch.Item{
+				{Name: "Wood", Stack: 1, Quality: 1, Durability: 1},
+				{Name: "ReallyLongInventoryItemName", Stack: 2, Quality: 3, Durability: 4},
+			},
+		},
+	}
+	var stdout bytes.Buffer
+	runner.stdout = &stdout
+
+	if err := runner.listInventory(character); err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("stdout = %q, want two inventory lines", stdout.String())
+	}
+	firstStack := strings.Index(lines[0], "stack=")
+	secondStack := strings.Index(lines[1], "stack=")
+	if firstStack == -1 || firstStack != secondStack {
+		t.Fatalf("stdout = %q, want aligned stack columns", stdout.String())
 	}
 }
 
