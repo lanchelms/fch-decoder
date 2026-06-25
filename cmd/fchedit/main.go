@@ -74,12 +74,12 @@ func (op setPlayerStatOp) apply(c *fch.Character) error {
 type statSetter func(*fch.Character, string, float32)
 
 type setStatOp struct {
-	assignment fch.Assignment
+	assignment assignment
 	set        statSetter
 }
 
 func (op setStatOp) apply(c *fch.Character) error {
-	op.set(c, op.assignment.Name, op.assignment.Value)
+	op.set(c, op.assignment.name, op.assignment.value)
 	return nil
 }
 
@@ -152,7 +152,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 }
 
 func parseAddInventory(value string) (editOp, error) {
-	item, err := fch.ParseInventoryItem(value)
+	item, err := parseInventoryItem(value)
 	if err != nil {
 		return nil, err
 	}
@@ -168,32 +168,32 @@ func parseRemoveInventory(value string) (editOp, error) {
 }
 
 func parseSetSkillLevel(value string) (editOp, error) {
-	assignment, err := fch.ParseAssignment(value)
+	assignment, err := parseAssignment(value)
 	if err != nil {
 		return nil, err
 	}
-	skill, err := fch.ParseSkillRef(assignment.Name)
+	skill, err := parseSkillRef(assignment.name)
 	if err != nil {
 		return nil, err
 	}
-	return setSkillLevelOp{skillType: skill.Type, name: skill.Name, level: assignment.Value}, nil
+	return setSkillLevelOp{skillType: skill.skillType, name: skill.name, level: assignment.value}, nil
 }
 
 func parseSetPlayerStat(value string) (editOp, error) {
-	assignment, err := fch.ParseAssignment(value)
+	assignment, err := parseAssignment(value)
 	if err != nil {
 		return nil, err
 	}
-	stat, err := fch.ParsePlayerStatRef(assignment.Name)
+	stat, err := parsePlayerStatRef(assignment.name)
 	if err != nil {
 		return nil, err
 	}
-	return setPlayerStatOp{index: stat.Index, name: stat.Name, value: assignment.Value}, nil
+	return setPlayerStatOp{index: stat.index, name: stat.name, value: assignment.value}, nil
 }
 
 func parseSetStat(set statSetter) func(string) (editOp, error) {
 	return func(value string) (editOp, error) {
-		assignment, err := fch.ParseAssignment(value)
+		assignment, err := parseAssignment(value)
 		if err != nil {
 			return nil, err
 		}

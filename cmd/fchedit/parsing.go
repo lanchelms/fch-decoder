@@ -1,43 +1,44 @@
-package fch
+package main
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	fch "github.com/lanchelms/fch-decoder"
 )
 
-type Assignment struct {
-	Name  string
-	Value float32
+type assignment struct {
+	name  string
+	value float32
 }
 
-type SkillRef struct {
-	Type int32
-	Name string
+type skillRef struct {
+	skillType int32
+	name      string
 }
 
-type PlayerStatRef struct {
-	Index int
-	Name  string
+type playerStatRef struct {
+	index int
+	name  string
 }
 
 type inventoryItemParser struct {
 	parts []string
-	item  Item
+	item  fch.Item
 }
 
-// ParseInventoryItem parses a structured inventory item specification.
-func ParseInventoryItem(value string) (Item, error) {
+func parseInventoryItem(value string) (fch.Item, error) {
 	parser := inventoryItemParser{parts: strings.Split(value, ",")}
 	return parser.parse()
 }
 
-func (p *inventoryItemParser) parse() (Item, error) {
+func (p *inventoryItemParser) parse() (fch.Item, error) {
 	if err := p.parseName(); err != nil {
-		return Item{}, err
+		return fch.Item{}, err
 	}
 	if err := p.parseFields(); err != nil {
-		return Item{}, err
+		return fch.Item{}, err
 	}
 	return p.item, nil
 }
@@ -47,7 +48,7 @@ func (p *inventoryItemParser) parseName() error {
 	if name == "" {
 		return fmt.Errorf("inventory item name is required")
 	}
-	p.item = Item{
+	p.item = fch.Item{
 		Name:       name,
 		Stack:      1,
 		Durability: 1,
@@ -110,48 +111,45 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 	return err
 }
 
-// ParseAssignment parses a name=value assignment with a float32 value.
-func ParseAssignment(value string) (Assignment, error) {
+func parseAssignment(value string) (assignment, error) {
 	name, raw, ok := strings.Cut(value, "=")
 	if !ok {
-		return Assignment{}, fmt.Errorf("expected name=value, got %q", value)
+		return assignment{}, fmt.Errorf("expected name=value, got %q", value)
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return Assignment{}, fmt.Errorf("assignment name is required")
+		return assignment{}, fmt.Errorf("assignment name is required")
 	}
 	amount, err := parseFloat32(strings.TrimSpace(raw))
 	if err != nil {
-		return Assignment{}, err
+		return assignment{}, err
 	}
-	return Assignment{Name: name, Value: amount}, nil
+	return assignment{name: name, value: amount}, nil
 }
 
-// ParseSkillRef resolves either a numeric skill type or a known skill name.
-func ParseSkillRef(value string) (SkillRef, error) {
+func parseSkillRef(value string) (skillRef, error) {
 	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
-		return SkillRef{Type: int32(n), Name: value}, nil
+		return skillRef{skillType: int32(n), name: value}, nil
 	}
-	skillType, ok := SkillTypeByName(value)
+	skillType, ok := fch.SkillTypeByName(value)
 	if !ok {
-		return SkillRef{}, fmt.Errorf("unknown skill %q", value)
+		return skillRef{}, fmt.Errorf("unknown skill %q", value)
 	}
-	return SkillRef{Type: skillType, Name: value}, nil
+	return skillRef{skillType: skillType, name: value}, nil
 }
 
-// ParsePlayerStatRef resolves either a numeric player stat index or a known player stat name.
-func ParsePlayerStatRef(value string) (PlayerStatRef, error) {
+func parsePlayerStatRef(value string) (playerStatRef, error) {
 	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
 		if n < 0 {
-			return PlayerStatRef{}, fmt.Errorf("invalid player stat index %d", n)
+			return playerStatRef{}, fmt.Errorf("invalid player stat index %d", n)
 		}
-		return PlayerStatRef{Index: int(n), Name: value}, nil
+		return playerStatRef{index: int(n), name: value}, nil
 	}
-	index, ok := PlayerStatIndexByName(value)
+	index, ok := fch.PlayerStatIndexByName(value)
 	if !ok {
-		return PlayerStatRef{}, fmt.Errorf("unknown player stat %q", value)
+		return playerStatRef{}, fmt.Errorf("unknown player stat %q", value)
 	}
-	return PlayerStatRef{Index: index, Name: value}, nil
+	return playerStatRef{index: index, name: value}, nil
 }
 
 func parseFloat32(value string) (float32, error) {
