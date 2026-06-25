@@ -3,11 +3,10 @@ package main
 import "testing"
 
 func TestParseInventoryItem(t *testing.T) {
-	spec, err := parseInventoryItem("Wood,stack=50,durability=0.75,grid-x=1,grid-y=2,equipped=true,quality=3,variant=4,crafter-id=123,crafter-name=Tester,world-level=2,picked-up=false,replace=true")
+	item, positioned, err := parseInventoryItem("Wood,stack=50,durability=0.75,pos=1:2,equipped=true,quality=3,variant=4,crafter-id=123,crafter-name=Tester,world-level=2,picked-up=false")
 	if err != nil {
 		t.Fatal(err)
 	}
-	item := spec.item
 	if item.Name != "Wood" ||
 		item.Stack != 50 ||
 		item.Durability != 0.75 ||
@@ -20,19 +19,18 @@ func TestParseInventoryItem(t *testing.T) {
 		item.CrafterName != "Tester" ||
 		item.WorldLevel != 2 ||
 		item.PickedUp ||
-		!spec.replace {
-		t.Fatalf("spec = %+v", spec)
+		!positioned {
+		t.Fatalf("item = %+v positioned = %v", item, positioned)
 	}
 }
 
 func TestParseInventoryItemDefaults(t *testing.T) {
-	spec, err := parseInventoryItem("Stone")
+	item, positioned, err := parseInventoryItem("Stone")
 	if err != nil {
 		t.Fatal(err)
 	}
-	item := spec.item
-	if item.Name != "Stone" || item.Stack != 1 || item.Durability != 100 || item.Quality != 1 || !item.PickedUp || spec.replace {
-		t.Fatalf("spec = %+v, want defaults", spec)
+	if item.Name != "Stone" || item.Stack != 1 || item.Durability != 100 || item.Quality != 1 || !item.PickedUp || positioned {
+		t.Fatalf("item = %+v positioned = %v, want defaults", item, positioned)
 	}
 }
 
@@ -42,13 +40,17 @@ func TestParseInventoryItemRejectsUnsafeValues(t *testing.T) {
 		"Wood,stack=0",
 		"Wood,durability=-1",
 		"Wood,durability=NaN",
-		"Wood,grid-x=-1",
-		"Wood,grid-y=-1",
+		"Wood,pos=-1:0",
+		"Wood,pos=0:-1",
+		"Wood,pos=0",
+		"Wood,pos=0:",
+		"Wood,pos=:0",
+		"Wood,pos=0:0:0",
 		"Wood,quality=0",
 		"Wood,variant=-1",
 	}
 	for _, value := range tests {
-		if _, err := parseInventoryItem(value); err == nil {
+		if _, _, err := parseInventoryItem(value); err == nil {
 			t.Fatalf("parseInventoryItem(%q) error = nil, want error", value)
 		}
 	}

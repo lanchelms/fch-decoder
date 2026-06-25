@@ -22,16 +22,12 @@ type playerStatRef struct {
 }
 
 type inventoryItemParser struct {
-	parts []string
-	spec  inventoryItemSpec
+	parts      []string
+	item       fch.Item
+	positioned bool
 }
 
-type inventoryItemSpec struct {
-	item    fch.Item
-	replace bool
-}
-
-func parseInventoryItem(value string) (inventoryItemSpec, error) {
+func parseInventoryItem(value string) (fch.Item, bool, error) {
 	parser := inventoryItemParser{parts: strings.Split(value, ",")}
 	return parser.parse()
 }
@@ -44,14 +40,14 @@ func parseInventoryName(value string) (string, error) {
 	return name, nil
 }
 
-func (p *inventoryItemParser) parse() (inventoryItemSpec, error) {
+func (p *inventoryItemParser) parse() (fch.Item, bool, error) {
 	if err := p.parseName(); err != nil {
-		return inventoryItemSpec{}, err
+		return fch.Item{}, false, err
 	}
 	if err := p.parseFields(); err != nil {
-		return inventoryItemSpec{}, err
+		return fch.Item{}, false, err
 	}
-	return p.spec, nil
+	return p.item, p.positioned, nil
 }
 
 func (p *inventoryItemParser) parseName() error {
@@ -59,7 +55,7 @@ func (p *inventoryItemParser) parseName() error {
 	if name == "" {
 		return fmt.Errorf("inventory item name is required")
 	}
-	p.spec.item = fch.Item{
+	p.item = fch.Item{
 		Name:       name,
 		Stack:      1,
 		Durability: 100,
@@ -95,51 +91,69 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 	var err error
 	switch key {
 	case "stack":
-		p.spec.item.Stack, err = parseInt32(raw)
-		if err == nil && p.spec.item.Stack < 1 {
+		p.item.Stack, err = parseInt32(raw)
+		if err == nil && p.item.Stack < 1 {
 			return fmt.Errorf("must be at least 1")
 		}
 	case "durability":
-		p.spec.item.Durability, err = parseFiniteFloat32(raw)
-		if err == nil && p.spec.item.Durability < 0 {
+		p.item.Durability, err = parseFiniteFloat32(raw)
+		if err == nil && p.item.Durability < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
-	case "grid-x":
-		p.spec.item.GridX, err = parseInt32(raw)
-		if err == nil && p.spec.item.GridX < 0 {
-			return fmt.Errorf("must be nonnegative")
-		}
-	case "grid-y":
-		p.spec.item.GridY, err = parseInt32(raw)
-		if err == nil && p.spec.item.GridY < 0 {
-			return fmt.Errorf("must be nonnegative")
-		}
+	case "pos":
+		err = p.setPosition(raw)
 	case "equipped":
-		p.spec.item.Equipped, err = strconv.ParseBool(raw)
+		p.item.Equipped, err = strconv.ParseBool(raw)
 	case "quality":
-		p.spec.item.Quality, err = parseInt32(raw)
-		if err == nil && p.spec.item.Quality < 1 {
+		p.item.Quality, err = parseInt32(raw)
+		if err == nil && p.item.Quality < 1 {
 			return fmt.Errorf("must be at least 1")
 		}
 	case "variant":
-		p.spec.item.Variant, err = parseInt32(raw)
-		if err == nil && p.spec.item.Variant < 0 {
+		p.item.Variant, err = parseInt32(raw)
+		if err == nil && p.item.Variant < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
 	case "crafter-id":
-		p.spec.item.CrafterID, err = strconv.ParseUint(raw, 10, 64)
+		p.item.CrafterID, err = strconv.ParseUint(raw, 10, 64)
 	case "crafter-name":
-		p.spec.item.CrafterName = raw
+		p.item.CrafterName = raw
 	case "world-level":
-		p.spec.item.WorldLevel, err = parseUint32(raw)
+		p.item.WorldLevel, err = parseUint32(raw)
 	case "picked-up":
-		p.spec.item.PickedUp, err = strconv.ParseBool(raw)
-	case "replace":
-		p.spec.replace, err = strconv.ParseBool(raw)
+		p.item.PickedUp, err = strconv.ParseBool(raw)
 	default:
 		return fmt.Errorf("unknown inventory item field %q", key)
 	}
 	return err
+}
+
+func (p *inventoryItemParser) setPosition(raw string) error {
+	x, y, ok := strings.Cut(raw, ":")
+	if !ok || x == "" || y == "" || strings.Contains(y, ":") {
+		return fmt.Errorf("must be x:y")
+	}
+
+	gridX, err := parseInt32(x)
+	if err != nil {
+		return err
+	}
+	if gridX < 0 {
+		return fmt.Errorf("x must be nonnegative")
+	}
+
+	gridY, err := parseInt32(y)
+	if err != nil {
+		return err
+	}
+	if gridY < 0 {
+		return fmt.Errorf("y must be nonnegative")
+	}
+
+	p.item.GridX = gridX
+	p.item.GridY = gridY
+	p.positioned = true
+	return nil
 }
 
 func parseStatName(value string) (string, error) {

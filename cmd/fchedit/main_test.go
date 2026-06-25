@@ -17,8 +17,8 @@ func TestRunAppliesEditCommands(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	commands := [][]string{
-		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=50,grid-x=1,grid-y=2,quality=3,crafter-name=Tester"},
-		{"--character", out, "add", "inventory", "Stone,stack=25,grid-x=2,grid-y=2"},
+		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=50,pos=1:2,quality=3,crafter-name=Tester"},
+		{"--character", out, "add", "inventory", "Stone,stack=25,pos=2:2"},
 		{"--character", out, "remove", "inventory", "Wood"},
 		{"--character", out, "set", "skill", "Swords", "44.5"},
 		{"--character", out, "set", "skill", "Run", "22"},
@@ -140,9 +140,9 @@ func TestRunChainsSingleEditCommands(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
 	commands := [][]string{
-		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=1,grid-x=2,grid-y=2"},
+		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=1,pos=2:2"},
 		{"--character", out, "remove", "inventory", "Wood"},
-		{"--character", out, "add", "inventory", "Wood,stack=2,grid-x=2,grid-y=2"},
+		{"--character", out, "add", "inventory", "Wood,stack=2,pos=2:2"},
 	}
 	for _, args := range commands {
 		if err := run(args, ioDiscard{}, ioDiscard{}); err != nil {
@@ -179,14 +179,22 @@ func TestRunRejectsUnknownRemove(t *testing.T) {
 	}
 }
 
-func TestRunRejectsOccupiedInventorySlot(t *testing.T) {
+func TestRunAddsInventoryAtNextEmptySlot(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
-	occupied := decodeFile(t, in).Player.Inventory[0]
-	spec := fmt.Sprintf("Stone,grid-x=%d,grid-y=%d", occupied.GridX, occupied.GridY)
+	before := decodeFile(t, in)
+	x, y, ok := nextEmptyInventorySlot(before.Player.Inventory)
+	if !ok {
+		t.Fatal("fixture has no empty inventory slot")
+	}
 
-	err := run([]string{"--character", in, "add", "inventory", spec}, ioDiscard{}, ioDiscard{})
-	if err == nil || !strings.Contains(err.Error(), "inventory slot") || !strings.Contains(err.Error(), "occupied") {
-		t.Fatalf("run error = %v, want occupied inventory slot", err)
+	if err := run([]string{"--character", in, "add", "inventory", "Needle,stack=3"}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+
+	after := decodeFile(t, in)
+	item := findSlot(after.Player.Inventory, x, y)
+	if item == nil || item.Name != "Needle" || item.Stack != 3 {
+		t.Fatalf("placed item = %+v, want Needle stack 3 at %d:%d", item, x, y)
 	}
 }
 
@@ -194,7 +202,7 @@ func TestRunReplacesOccupiedInventorySlot(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	before := decodeFile(t, in)
 	occupied := before.Player.Inventory[0]
-	spec := fmt.Sprintf("Stone,stack=25,grid-x=%d,grid-y=%d,replace=true", occupied.GridX, occupied.GridY)
+	spec := fmt.Sprintf("Stone,stack=25,pos=%d:%d", occupied.GridX, occupied.GridY)
 
 	if err := run([]string{"--character", in, "add", "inventory", spec}, ioDiscard{}, ioDiscard{}); err != nil {
 		t.Fatal(err)
@@ -379,6 +387,17 @@ func findSlot(items []fch.Item, gridX int32, gridY int32) *fch.Item {
 		}
 	}
 	return nil
+}
+
+func nextEmptyInventorySlot(items []fch.Item) (int32, int32, bool) {
+	for y := int32(0); y < 4; y++ {
+		for x := int32(0); x < 8; x++ {
+			if findSlot(items, x, y) == nil {
+				return x, y, true
+			}
+		}
+	}
+	return 0, 0, false
 }
 
 func skillLevel(skills []fch.Skill, skillType int32) float32 {

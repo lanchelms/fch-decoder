@@ -23,6 +23,12 @@ func TestCharacterEditMethods(t *testing.T) {
 	if len(character.Player.Inventory) != 1 || character.Player.Inventory[0].Name != "Resin" {
 		t.Fatalf("inventory = %+v, want replaced item", character.Player.Inventory)
 	}
+	if err := character.PlaceInventoryItem(Item{Name: "Feathers"}); err != nil {
+		t.Fatal(err)
+	}
+	if item := character.Player.Inventory[1]; item.Name != "Feathers" || item.GridX != 1 || item.GridY != 0 {
+		t.Fatalf("placed item = %+v, want Feathers at 1,0", item)
+	}
 
 	character.SetSkillLevel(102, "Run", 22)
 	character.SetSkillLevel(102, "Run", 23)
@@ -46,5 +52,18 @@ func TestCharacterEditMethods(t *testing.T) {
 	}
 	if character.PlayerStatCount != 3 || len(character.PlayerStats) != 3 || character.PlayerStats[2].Value != 6 {
 		t.Fatalf("player stats = count %d entries %+v", character.PlayerStatCount, character.PlayerStats)
+	}
+}
+
+func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {
+	character := &Character{}
+	for y := int32(0); y < inventoryHeight; y++ {
+		for x := int32(0); x < inventoryWidth; x++ {
+			character.AddInventoryItem(Item{Name: "Wood", GridX: x, GridY: y})
+		}
+	}
+
+	if err := character.PlaceInventoryItem(Item{Name: "Stone"}); err == nil {
+		t.Fatal("PlaceInventoryItem error = nil, want full inventory error")
 	}
 }

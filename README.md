@@ -109,7 +109,7 @@ fchedit set player-stat Deaths 0
 fchedit set skill Run 50
 fchedit set enemy '$enemy_greydwarf' 25
 fchedit set material '$item_wood' 100
-fchedit add inventory 'Wood,stack=50,grid-x=1,grid-y=2,quality=1'
+fchedit add inventory 'Wood,stack=50,pos=1:2,quality=1'
 fchedit remove inventory Stone
 ```
 
@@ -146,13 +146,14 @@ fchedit list inventory
 ```
 
 Inventory additions accept
-`name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool,replace=bool]`.
+`name[,stack=n,durability=n,pos=x:y,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]`.
 Numeric fields are validated before writing. Skill levels must be between 0 and
 100, stat counters must be nonnegative finite numbers, inventory stack and
 quality must be at least 1, and item/stat names must not be empty. Inventory
-items default to `stack=1`, `durability=100`, `quality=1`, `grid-x=0`,
-`grid-y=0`, and `picked-up=true`. Adding an item fails if another item already
-occupies the target grid slot; pass `replace=true` to overwrite that slot.
+items default to `stack=1`, `durability=100`, `quality=1`, and
+`picked-up=true`. If `pos` is omitted, fchedit uses the next empty normal
+inventory slot. If `pos` is supplied, both coordinates must be specified as
+`x:y`; an occupied target slot is overwritten.
 
 Container example:
 

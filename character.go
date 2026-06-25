@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+const (
+	inventoryWidth  = 8
+	inventoryHeight = 4
+)
+
 type Character struct {
 	FileLength      uint32      `json:"fileLength"`
 	Version         uint32      `json:"version"`
@@ -35,6 +40,30 @@ func (c *Character) PutInventoryItem(item Item, replace bool) error {
 	}
 	c.AddInventoryItem(item)
 	return nil
+}
+
+// PlaceInventoryItem adds item to the first empty normal inventory slot.
+func (c *Character) PlaceInventoryItem(item Item) error {
+	for y := int32(0); y < inventoryHeight; y++ {
+		for x := int32(0); x < inventoryWidth; x++ {
+			if !c.inventorySlotOccupied(x, y) {
+				item.GridX = x
+				item.GridY = y
+				c.AddInventoryItem(item)
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("inventory has no empty slots")
+}
+
+func (c *Character) inventorySlotOccupied(x int32, y int32) bool {
+	for _, item := range c.Player.Inventory {
+		if item.GridX == x && item.GridY == y {
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveInventoryItem removes the first inventory item with an exact name match.

@@ -30,17 +30,20 @@ type addCmd struct {
 }
 
 type addInventoryCmd struct {
-	Item string `arg:"" name:"item" help:"Item spec: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool,replace=bool]."`
+	Item string `arg:"" name:"item" help:"Item spec: name[,stack=n,durability=n,pos=x:y,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]."`
 }
 
 func (cmd *addInventoryCmd) Run(r *editRunner) error {
-	spec, err := parseInventoryItem(cmd.Item)
+	item, positioned, err := parseInventoryItem(cmd.Item)
 	if err != nil {
 		return err
 	}
 	return r.apply(func(c *fch.Character) error {
-		return c.PutInventoryItem(spec.item, spec.replace)
-	}, fmt.Sprintf("add inventory %s", spec.item.Name))
+		if positioned {
+			return c.PutInventoryItem(item, true)
+		}
+		return c.PlaceInventoryItem(item)
+	}, fmt.Sprintf("add inventory %s", item.Name))
 }
 
 type removeCmd struct {
