@@ -231,6 +231,7 @@ func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
 	parser, err := kong.New(
 		&cli,
 		kong.Name("fchprom"),
+		kong.Description("Serve Prometheus metrics from a directory of Valheim character files."),
 		kong.Writers(stdout, stderr),
 		kong.Vars{"num_cpu": strconv.Itoa(runtime.NumCPU())},
 	)

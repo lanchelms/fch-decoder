@@ -23,7 +23,12 @@ func main() {
 
 func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	var cli cli
-	parser, err := kong.New(&cli, kong.Name("fchdump"), kong.Writers(stdout, stderr))
+	parser, err := kong.New(
+		&cli,
+		kong.Name("fchdump"),
+		kong.Description("Decode a Valheim character file and print formatted JSON."),
+		kong.Writers(stdout, stderr),
+	)
 	if err != nil {
 		return err
 	}

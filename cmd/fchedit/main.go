@@ -197,7 +197,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 
 func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, *kong.Context, error) {
 	var cli cli
-	parser, err := kong.New(&cli, kong.Name("fchedit"), kong.Writers(stdout, stderr))
+	parser, err := kong.New(
+		&cli,
+		kong.Name("fchedit"),
+		kong.Description("Edit a Valheim character file."),
+		kong.Writers(stdout, stderr),
+	)
 	if err != nil {
 		return cli, nil, err
 	}
