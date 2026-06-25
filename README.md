@@ -95,7 +95,8 @@ docker run --rm -v "$PWD/testdata:/data:ro" \
 
 `fchedit` decodes one character file, applies requested edits, recalculates
 the payload length and trailer hash, and writes the edited file in place by
-default. Use `--out` to write a copy instead.
+default. In-place edits create a numbered `.bak` backup next to the original.
+Use `--out` to write a copy instead.
 
 ```sh
 fchedit --character character.fch set player-stat Deaths 0
@@ -120,8 +121,31 @@ To write a copy:
 fchedit --character character.fch --out edited.fch set skill Run 50
 ```
 
+To preview an edit without writing:
+
+```sh
+fchedit --character character.fch --dry-run set skill Run 50
+```
+
+To edit in place without creating a backup:
+
+```sh
+fchedit --character character.fch --no-backup set skill Run 50
+```
+
+To discover editable names:
+
+```sh
+fchedit list skills
+fchedit list player-stats
+fchedit --character character.fch list inventory
+```
+
 Inventory additions accept
 `name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]`.
+Numeric fields are validated before writing. Skill levels must be between 0 and
+100, stat counters must be nonnegative finite numbers, inventory stack and
+quality must be at least 1, and item/stat names must not be empty.
 
 Container example:
 

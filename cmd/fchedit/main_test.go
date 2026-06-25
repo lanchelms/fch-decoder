@@ -129,7 +129,7 @@ func TestRunPrefersExplicitCharacter(t *testing.T) {
 
 func TestRunRequiresCharacter(t *testing.T) {
 	err := run([]string{"set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
-	if err == nil || !strings.Contains(err.Error(), "missing flags: --character") {
+	if err == nil || !strings.Contains(err.Error(), "missing character") {
 		t.Fatalf("run error = %v, want missing character", err)
 	}
 }
@@ -185,6 +185,95 @@ func TestRunRejectsUnknownSkill(t *testing.T) {
 	err := run([]string{"--character", in, "--out", out, "set", "skill", "Nope", "1"}, ioDiscard{}, ioDiscard{})
 	if err == nil || !strings.Contains(err.Error(), `unknown skill "Nope"`) {
 		t.Fatalf("run error = %v, want unknown skill", err)
+	}
+}
+
+func TestRunCreatesInPlaceBackup(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+
+	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(in + ".bak"); err != nil {
+		t.Fatalf("backup stat error = %v", err)
+	}
+}
+
+func TestRunNoBackup(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+
+	if err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "3"}, ioDiscard{}, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
+		t.Fatalf("backup stat error = %v, want not exist", err)
+	}
+}
+
+func TestRunDryRunDoesNotWrite(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+
+	var stdout bytes.Buffer
+	if err := run([]string{"--character", in, "--dry-run", "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	got := decodeFile(t, in)
+	if got.PlayerStats[0].Value == 3 {
+		t.Fatal("dry run wrote the character file")
+	}
+	if !strings.Contains(stdout.String(), "would set player-stat Deaths=3") {
+		t.Fatalf("stdout = %q, want dry-run summary", stdout.String())
+	}
+	if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
+		t.Fatalf("backup stat error = %v, want not exist", err)
+	}
+}
+
+func TestRunListsWithoutCharacter(t *testing.T) {
+	var stdout bytes.Buffer
+	if err := run([]string{"list", "player-stats"}, &stdout, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "0\tDeaths") {
+		t.Fatalf("stdout = %q, want player stats", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := run([]string{"list", "skills"}, &stdout, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "Run") {
+		t.Fatalf("stdout = %q, want skills", stdout.String())
+	}
+}
+
+func TestRunListsInventory(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+
+	var stdout bytes.Buffer
+	if err := run([]string{"--character", in, "list", "inventory"}, &stdout, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "stack=") {
+		t.Fatalf("stdout = %q, want inventory", stdout.String())
+	}
+}
+
+func TestRunRejectsUnsafeValues(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	tests := [][]string{
+		{"--character", in, "set", "player-stat", "2147483647", "1"},
+		{"--character", in, "set", "player-stat", "Deaths", "-1"},
+		{"--character", in, "set", "skill", "Run", "101"},
+		{"--character", in, "set", "skill", "Run", "NaN"},
+		{"--character", in, "set", "enemy", " ", "1"},
+		{"--character", in, "set", "material", "$item_wood", "-1"},
+		{"--character", in, "add", "inventory", "Wood,stack=0"},
+	}
+	for _, args := range tests {
+		if err := run(args, ioDiscard{}, ioDiscard{}); err == nil {
+			t.Fatalf("run(%v) error = nil, want validation error", args)
+		}
 	}
 }
 

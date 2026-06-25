@@ -1,6 +1,9 @@
 package fch
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 var skillNames = map[int32]string{
 	0:   "None",
@@ -42,6 +45,16 @@ func SkillTypeByName(name string) (int32, bool) {
 		}
 	}
 	return 0, false
+}
+
+// SkillNames returns known skill names sorted alphabetically.
+func SkillNames() []string {
+	names := make([]string, 0, len(skillNames))
+	for _, name := range skillNames {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 var playerStatNames = []string{
@@ -166,4 +179,9 @@ func PlayerStatIndexByName(name string) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// PlayerStatNames returns known player stat names in saved stat order.
+func PlayerStatNames() []string {
+	return append([]string(nil), playerStatNames...)
 }

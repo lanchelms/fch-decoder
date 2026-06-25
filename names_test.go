@@ -33,6 +33,18 @@ func TestSkillTypeByName(t *testing.T) {
 	}
 }
 
+func TestSkillNames(t *testing.T) {
+	got := SkillNames()
+	if len(got) == 0 {
+		t.Fatal("SkillNames returned no names")
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i-1] > got[i] {
+			t.Fatalf("SkillNames = %v, want sorted names", got)
+		}
+	}
+}
+
 func TestPlayerStatName(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -62,5 +74,16 @@ func TestPlayerStatIndexByName(t *testing.T) {
 	}
 	if _, ok := PlayerStatIndexByName("not-a-stat"); ok {
 		t.Fatal("PlayerStatIndexByName(not-a-stat) ok = true, want false")
+	}
+}
+
+func TestPlayerStatNames(t *testing.T) {
+	got := PlayerStatNames()
+	if len(got) == 0 || got[0] != "Deaths" {
+		t.Fatalf("PlayerStatNames = %v, want Deaths first", got)
+	}
+	got[0] = "mutated"
+	if PlayerStatNames()[0] != "Deaths" {
+		t.Fatal("PlayerStatNames returned mutable package storage")
 	}
 }

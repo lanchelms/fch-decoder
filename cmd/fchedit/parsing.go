@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	fch "github.com/lanchelms/fch-decoder"
 )
+
+const maxSkillLevel = 100
 
 type skillRef struct {
 	skillType int32
@@ -88,18 +91,36 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 	switch key {
 	case "stack":
 		p.item.Stack, err = parseInt32(raw)
+		if err == nil && p.item.Stack < 1 {
+			return fmt.Errorf("must be at least 1")
+		}
 	case "durability":
-		p.item.Durability, err = parseFloat32(raw)
+		p.item.Durability, err = parseFiniteFloat32(raw)
+		if err == nil && p.item.Durability < 0 {
+			return fmt.Errorf("must be nonnegative")
+		}
 	case "grid-x":
 		p.item.GridX, err = parseInt32(raw)
+		if err == nil && p.item.GridX < 0 {
+			return fmt.Errorf("must be nonnegative")
+		}
 	case "grid-y":
 		p.item.GridY, err = parseInt32(raw)
+		if err == nil && p.item.GridY < 0 {
+			return fmt.Errorf("must be nonnegative")
+		}
 	case "equipped":
 		p.item.Equipped, err = strconv.ParseBool(raw)
 	case "quality":
 		p.item.Quality, err = parseInt32(raw)
+		if err == nil && p.item.Quality < 1 {
+			return fmt.Errorf("must be at least 1")
+		}
 	case "variant":
 		p.item.Variant, err = parseInt32(raw)
+		if err == nil && p.item.Variant < 0 {
+			return fmt.Errorf("must be nonnegative")
+		}
 	case "crafter-id":
 		p.item.CrafterID, err = strconv.ParseUint(raw, 10, 64)
 	case "crafter-name":
@@ -114,8 +135,40 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 	return err
 }
 
+func parseStatName(value string) (string, error) {
+	name := strings.TrimSpace(value)
+	if name == "" {
+		return "", fmt.Errorf("stat name is required")
+	}
+	return name, nil
+}
+
+func parseSkillLevel(value float32) (float32, error) {
+	if err := validateFinite(value); err != nil {
+		return 0, fmt.Errorf("invalid skill level: %w", err)
+	}
+	if value < 0 || value > maxSkillLevel {
+		return 0, fmt.Errorf("invalid skill level %v: must be between 0 and %d", value, maxSkillLevel)
+	}
+	return value, nil
+}
+
+func parseStatValue(value float32) (float32, error) {
+	if err := validateFinite(value); err != nil {
+		return 0, fmt.Errorf("invalid stat value: %w", err)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("invalid stat value %v: must be nonnegative", value)
+	}
+	return value, nil
+}
+
 func parseSkillRef(value string) (skillRef, error) {
+	value = strings.TrimSpace(value)
 	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
+		if n < 0 {
+			return skillRef{}, fmt.Errorf("invalid skill type %d", n)
+		}
 		return skillRef{skillType: int32(n), name: value}, nil
 	}
 	skillType, ok := fch.SkillTypeByName(value)
@@ -126,9 +179,13 @@ func parseSkillRef(value string) (skillRef, error) {
 }
 
 func parsePlayerStatRef(value string) (playerStatRef, error) {
+	value = strings.TrimSpace(value)
 	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
 		if n < 0 {
 			return playerStatRef{}, fmt.Errorf("invalid player stat index %d", n)
+		}
+		if n >= int64(len(fch.PlayerStatNames())) {
+			return playerStatRef{}, fmt.Errorf("unknown player stat index %d", n)
 		}
 		return playerStatRef{index: int(n), name: value}, nil
 	}
@@ -139,12 +196,16 @@ func parsePlayerStatRef(value string) (playerStatRef, error) {
 	return playerStatRef{index: index, name: value}, nil
 }
 
-func parseFloat32(value string) (float32, error) {
+func parseFiniteFloat32(value string) (float32, error) {
 	f, err := strconv.ParseFloat(value, 32)
 	if err != nil {
 		return 0, err
 	}
-	return float32(f), nil
+	v := float32(f)
+	if err := validateFinite(v); err != nil {
+		return 0, err
+	}
+	return v, nil
 }
 
 func parseInt32(value string) (int32, error) {
@@ -161,4 +222,14 @@ func parseUint32(value string) (uint32, error) {
 		return 0, err
 	}
 	return uint32(n), nil
+}
+
+func validateFinite(value float32) error {
+	if math.IsNaN(float64(value)) {
+		return fmt.Errorf("must not be NaN")
+	}
+	if math.IsInf(float64(value), 0) {
+		return fmt.Errorf("must be finite")
+	}
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	fch "github.com/lanchelms/fch-decoder"
@@ -13,11 +14,14 @@ import (
 const characterEnv = "CHARACTER"
 
 type cli struct {
-	Character string    `name:"character" env:"CHARACTER" required:"" type:"path" help:"Character file to edit."`
+	Character string    `name:"character" env:"CHARACTER" type:"path" help:"Character file to edit."`
 	Out       string    `name:"out" type:"path" help:"Write the edited character to this path instead of updating the input file."`
+	DryRun    bool      `name:"dry-run" help:"Decode, validate, and summarize the edit without writing a file."`
+	NoBackup  bool      `name:"no-backup" help:"Do not create a backup before editing a character in place."`
 	Add       addCmd    `cmd:"" help:"Add character data."`
 	Remove    removeCmd `cmd:"" help:"Remove character data."`
 	Set       setCmd    `cmd:"" help:"Set character data."`
+	List      listCmd   `cmd:"" help:"List editable names or character data."`
 }
 
 type addCmd struct {
@@ -36,7 +40,7 @@ func (cmd *addInventoryCmd) Run(r *editRunner) error {
 	return r.apply(func(c *fch.Character) error {
 		c.AddInventoryItem(item)
 		return nil
-	})
+	}, fmt.Sprintf("add inventory %s", item.Name))
 }
 
 type removeCmd struct {
@@ -54,7 +58,7 @@ func (cmd *removeInventoryCmd) Run(r *editRunner) error {
 	}
 	return r.apply(func(c *fch.Character) error {
 		return c.RemoveInventoryItem(name)
-	})
+	}, fmt.Sprintf("remove inventory %s", name))
 }
 
 type setCmd struct {
@@ -74,10 +78,14 @@ func (cmd *setSkillCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
+	level, err := parseSkillLevel(cmd.Level)
+	if err != nil {
+		return err
+	}
 	return r.apply(func(c *fch.Character) error {
-		c.SetSkillLevel(skill.skillType, skill.name, cmd.Level)
+		c.SetSkillLevel(skill.skillType, skill.name, level)
 		return nil
-	})
+	}, fmt.Sprintf("set skill %s=%v", skill.name, level))
 }
 
 type setEnemyCmd struct {
@@ -86,10 +94,18 @@ type setEnemyCmd struct {
 }
 
 func (cmd *setEnemyCmd) Run(r *editRunner) error {
+	name, err := parseStatName(cmd.Name)
+	if err != nil {
+		return err
+	}
+	value, err := parseStatValue(cmd.Value)
+	if err != nil {
+		return err
+	}
 	return r.apply(func(c *fch.Character) error {
-		c.UpsertEnemyStat(cmd.Name, cmd.Value)
+		c.UpsertEnemyStat(name, value)
 		return nil
-	})
+	}, fmt.Sprintf("set enemy %s=%v", name, value))
 }
 
 type setMaterialCmd struct {
@@ -98,10 +114,18 @@ type setMaterialCmd struct {
 }
 
 func (cmd *setMaterialCmd) Run(r *editRunner) error {
+	name, err := parseStatName(cmd.Name)
+	if err != nil {
+		return err
+	}
+	value, err := parseStatValue(cmd.Value)
+	if err != nil {
+		return err
+	}
 	return r.apply(func(c *fch.Character) error {
-		c.UpsertMaterialStat(cmd.Name, cmd.Value)
+		c.UpsertMaterialStat(name, value)
 		return nil
-	})
+	}, fmt.Sprintf("set material %s=%v", name, value))
 }
 
 type setPlayerStatCmd struct {
@@ -114,23 +138,84 @@ func (cmd *setPlayerStatCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
-		return c.SetPlayerStat(stat.index, stat.name, cmd.Value)
-	})
-}
-
-type editRunner struct {
-	path   string
-	out    string
-	stdout io.Writer
-}
-
-func (r *editRunner) apply(edit func(*fch.Character) error) error {
-	data, err := os.ReadFile(r.path)
+	value, err := parseStatValue(cmd.Value)
 	if err != nil {
 		return err
 	}
+	return r.apply(func(c *fch.Character) error {
+		return c.SetPlayerStat(stat.index, stat.name, value)
+	}, fmt.Sprintf("set player-stat %s=%v", stat.name, value))
+}
+
+type listCmd struct {
+	Skills     listSkillsCmd     `cmd:"" help:"List known skill names."`
+	PlayerStat listPlayerStatCmd `cmd:"" name:"player-stats" help:"List known player stat names."`
+	Inventory  listInventoryCmd  `cmd:"" help:"List inventory items in the character file."`
+}
+
+type listSkillsCmd struct{}
+
+func (cmd *listSkillsCmd) Run(r *editRunner) error {
+	for _, name := range fch.SkillNames() {
+		fmt.Fprintln(r.stdout, name)
+	}
+	return nil
+}
+
+type listPlayerStatCmd struct{}
+
+func (cmd *listPlayerStatCmd) Run(r *editRunner) error {
+	for i, name := range fch.PlayerStatNames() {
+		fmt.Fprintf(r.stdout, "%d\t%s\n", i, name)
+	}
+	return nil
+}
+
+type listInventoryCmd struct{}
+
+func (cmd *listInventoryCmd) Run(r *editRunner) error {
+	character, err := r.readCharacter()
+	if err != nil {
+		return err
+	}
+	for _, item := range character.Player.Inventory {
+		fmt.Fprintf(r.stdout, "%s\tstack=%d\tquality=%d\tdurability=%v\tgrid=%d,%d\n",
+			item.Name,
+			item.Stack,
+			item.Quality,
+			item.Durability,
+			item.GridX,
+			item.GridY,
+		)
+	}
+	return nil
+}
+
+type editRunner struct {
+	path     string
+	out      string
+	dryRun   bool
+	noBackup bool
+	stdout   io.Writer
+}
+
+func (r *editRunner) readCharacter() (*fch.Character, error) {
+	if r.path == "" {
+		return nil, fmt.Errorf("missing character: set --character or CHARACTER")
+	}
+	data, err := os.ReadFile(r.path)
+	if err != nil {
+		return nil, fmt.Errorf("read character %s: %w", r.path, err)
+	}
 	character, err := fch.DecodeBytes(data)
+	if err != nil {
+		return nil, fmt.Errorf("decode character %s: %w", r.path, err)
+	}
+	return character, nil
+}
+
+func (r *editRunner) apply(edit func(*fch.Character) error, summary string) error {
+	character, err := r.readCharacter()
 	if err != nil {
 		return err
 	}
@@ -139,18 +224,63 @@ func (r *editRunner) apply(edit func(*fch.Character) error) error {
 	}
 	encoded, err := fch.EncodeBytes(character)
 	if err != nil {
-		return err
+		return fmt.Errorf("encode character %s: %w", r.path, err)
 	}
 
 	target := r.out
 	if target == "" {
 		target = r.path
 	}
-	if err := writeFile(target, encoded, r.path); err != nil {
-		return err
+	inPlace := target == r.path
+	if r.dryRun {
+		fmt.Fprintf(r.stdout, "would %s\n", summary)
+		fmt.Fprintf(r.stdout, "would write %s\n", target)
+		return nil
 	}
+
+	if inPlace && !r.noBackup {
+		backup, err := backupFile(r.path)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(r.stdout, "backup %s\n", backup)
+	}
+	if err := writeFile(target, encoded, r.path); err != nil {
+		return fmt.Errorf("write edited character %s: %w", target, err)
+	}
+	fmt.Fprintln(r.stdout, summary)
 	fmt.Fprintf(r.stdout, "wrote %s\n", target)
 	return nil
+}
+
+func backupFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read backup source %s: %w", path, err)
+	}
+	backup, err := nextBackupPath(path)
+	if err != nil {
+		return "", err
+	}
+	if err := writeFile(backup, data, path); err != nil {
+		return "", fmt.Errorf("write backup %s: %w", backup, err)
+	}
+	return backup, nil
+}
+
+func nextBackupPath(path string) (string, error) {
+	for i := 0; ; i++ {
+		candidate := path + ".bak"
+		if i > 0 {
+			candidate = fmt.Sprintf("%s.bak.%d", path, i)
+		}
+		if _, err := os.Stat(candidate); err != nil {
+			if os.IsNotExist(err) {
+				return candidate, nil
+			}
+			return "", fmt.Errorf("inspect backup path %s: %w", candidate, err)
+		}
+	}
 }
 
 func writeFile(path string, data []byte, modeFrom string) error {
@@ -191,7 +321,14 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	parser, err := kong.New(
 		&cli,
 		kong.Name("fchedit"),
-		kong.Description("Edit a Valheim character file."),
+		kong.Description(`Edit a Valheim character file.
+
+Examples:
+  fchedit --character character.fch set skill Run 50
+  fchedit --character character.fch --dry-run set player-stat Deaths 0
+  fchedit --character character.fch add inventory 'Wood,stack=50,quality=1'
+  fchedit list skills
+  fchedit list player-stats`),
 		kong.Writers(stdout, stderr),
 	)
 	if err != nil {
@@ -201,6 +338,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	runner := &editRunner{path: cli.Character, out: cli.Out, stdout: stdout}
+	runner := &editRunner{
+		path:     strings.TrimSpace(cli.Character),
+		out:      strings.TrimSpace(cli.Out),
+		dryRun:   cli.DryRun,
+		noBackup: cli.NoBackup,
+		stdout:   stdout,
+	}
 	return ctx.Run(runner)
 }

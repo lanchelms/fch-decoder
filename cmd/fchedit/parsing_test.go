@@ -33,6 +33,24 @@ func TestParseInventoryItemDefaults(t *testing.T) {
 	}
 }
 
+func TestParseInventoryItemRejectsUnsafeValues(t *testing.T) {
+	tests := []string{
+		"",
+		"Wood,stack=0",
+		"Wood,durability=-1",
+		"Wood,durability=NaN",
+		"Wood,grid-x=-1",
+		"Wood,grid-y=-1",
+		"Wood,quality=0",
+		"Wood,variant=-1",
+	}
+	for _, value := range tests {
+		if _, err := parseInventoryItem(value); err == nil {
+			t.Fatalf("parseInventoryItem(%q) error = nil, want error", value)
+		}
+	}
+}
+
 func TestParseInventoryName(t *testing.T) {
 	name, err := parseInventoryName(" Wood ")
 	if err != nil {
@@ -40,6 +58,12 @@ func TestParseInventoryName(t *testing.T) {
 	}
 	if name != "Wood" {
 		t.Fatalf("parseInventoryName = %q, want Wood", name)
+	}
+}
+
+func TestParseInventoryNameRejectsEmpty(t *testing.T) {
+	if _, err := parseInventoryName(" "); err == nil {
+		t.Fatal("parseInventoryName error = nil, want error")
 	}
 }
 
@@ -61,6 +85,12 @@ func TestParseSkillRef(t *testing.T) {
 	}
 }
 
+func TestParseSkillRefRejectsNegativeType(t *testing.T) {
+	if _, err := parseSkillRef("-1"); err == nil {
+		t.Fatal("parseSkillRef error = nil, want error")
+	}
+}
+
 func TestParsePlayerStatRef(t *testing.T) {
 	stat, err := parsePlayerStatRef("Builds")
 	if err != nil {
@@ -68,5 +98,34 @@ func TestParsePlayerStatRef(t *testing.T) {
 	}
 	if stat.index != 2 || stat.name != "Builds" {
 		t.Fatalf("parsePlayerStatRef = %+v", stat)
+	}
+}
+
+func TestParsePlayerStatRefRejectsInvalidIndex(t *testing.T) {
+	tests := []string{"-1", "2147483647"}
+	for _, value := range tests {
+		if _, err := parsePlayerStatRef(value); err == nil {
+			t.Fatalf("parsePlayerStatRef(%q) error = nil, want error", value)
+		}
+	}
+}
+
+func TestParseSkillLevel(t *testing.T) {
+	if _, err := parseSkillLevel(50); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []float32{-1, 101} {
+		if _, err := parseSkillLevel(value); err == nil {
+			t.Fatalf("parseSkillLevel(%v) error = nil, want error", value)
+		}
+	}
+}
+
+func TestParseStatValue(t *testing.T) {
+	if _, err := parseStatValue(50); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseStatValue(-1); err == nil {
+		t.Fatal("parseStatValue(-1) error = nil, want error")
 	}
 }
