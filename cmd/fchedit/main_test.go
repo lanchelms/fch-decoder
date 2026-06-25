@@ -127,6 +127,13 @@ func TestRunPrefersExplicitCharacter(t *testing.T) {
 	}
 }
 
+func TestRunRequiresCharacter(t *testing.T) {
+	err := run([]string{"set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+	if err == nil || !strings.Contains(err.Error(), "missing flags: --character") {
+		t.Fatalf("run error = %v, want missing character", err)
+	}
+}
+
 func TestRunChainsSingleEditCommands(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	out := filepath.Join(t.TempDir(), "edited.fch")
