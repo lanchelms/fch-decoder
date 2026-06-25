@@ -125,32 +125,6 @@ type editRunner struct {
 	stdout io.Writer
 }
 
-func main() {
-	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
-func run(args []string, stdout io.Writer, stderr io.Writer) error {
-	var cli cli
-	parser, err := kong.New(
-		&cli,
-		kong.Name("fchedit"),
-		kong.Description("Edit a Valheim character file."),
-		kong.Writers(stdout, stderr),
-	)
-	if err != nil {
-		return err
-	}
-	ctx, err := parser.Parse(args)
-	if err != nil {
-		return err
-	}
-	runner := &editRunner{path: cli.Character, out: cli.Out, stdout: stdout}
-	return ctx.Run(runner)
-}
-
 func (r *editRunner) apply(edit func(*fch.Character) error) error {
 	data, err := os.ReadFile(r.path)
 	if err != nil {
@@ -203,4 +177,30 @@ func writeFile(path string, data []byte, modeFrom string) error {
 		return err
 	}
 	return os.Rename(tmpPath, path)
+}
+
+func main() {
+	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run(args []string, stdout io.Writer, stderr io.Writer) error {
+	var cli cli
+	parser, err := kong.New(
+		&cli,
+		kong.Name("fchedit"),
+		kong.Description("Edit a Valheim character file."),
+		kong.Writers(stdout, stderr),
+	)
+	if err != nil {
+		return err
+	}
+	ctx, err := parser.Parse(args)
+	if err != nil {
+		return err
+	}
+	runner := &editRunner{path: cli.Character, out: cli.Out, stdout: stdout}
+	return ctx.Run(runner)
 }
