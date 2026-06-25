@@ -76,40 +76,67 @@ SHA-512 trailer hash over the inner character payload bytes.
 `fchdump` decodes one character file and writes formatted JSON to stdout.
 
 ```sh
-fchdump 'testdata/Steam_222222_bortson.fch'
+fchdump --character 'testdata/Steam_222222_bortson.fch'
+```
+
+You can also set `CHARACTER` and omit `--character`:
+
+```sh
+CHARACTER='testdata/Steam_222222_bortson.fch' fchdump
 ```
 
 Container example:
 
 ```sh
 docker run --rm -v "$PWD/testdata:/data:ro" \
-  ghcr.io/lanchelms/fch-decoder-fchdump:latest /data/Steam_222222_bortson.fch
+  ghcr.io/lanchelms/fch-decoder-fchdump:latest \
+  --character /data/Steam_222222_bortson.fch
 ```
 
 `fchedit` decodes one character file, applies requested edits, recalculates
-the payload length and trailer hash, and writes the edited file to `-out` unless
-`-in-place` is specified.
+the payload length and trailer hash, and writes the edited file in place by
+default. Use `--out` to write a copy instead.
 
 ```sh
-fchedit -out edited.fch \
-  -set-player-stat Deaths=0 \
-  -set-skill-level Run=50 \
-  -set-enemy-stat '$enemy_greydwarf=25' \
-  -set-material-stat '$item_wood=100' \
-  -add-inventory 'Wood,stack=50,quality=1' \
-  -remove-inventory Stone \
-  character.fch
+fchedit --character character.fch set player-stat Deaths 0
+fchedit --character character.fch set skill Run 50
+fchedit --character character.fch set enemy '$enemy_greydwarf' 25
+fchedit --character character.fch set material '$item_wood' 100
+fchedit --character character.fch add inventory 'Wood,stack=50,quality=1'
+fchedit --character character.fch remove inventory Stone
 ```
 
-Each edit flag may be repeated. Inventory additions accept
+To avoid repeating the character file, set `CHARACTER`:
+
+```sh
+export CHARACTER=character.fch
+fchedit set skill Run 50
+fchedit add inventory 'Wood,stack=50,quality=1'
+```
+
+To write a copy:
+
+```sh
+fchedit --character character.fch --out edited.fch set skill Run 50
+```
+
+Inventory additions accept
 `name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]`.
+
+Container example:
+
+```sh
+docker run --rm -v "$PWD/testdata:/data" \
+  ghcr.io/lanchelms/fch-decoder-fchedit:latest \
+  --character /data/Steam_222222_bortson.fch set skill Run 50
+```
 
 ## Prometheus Exporter
 
 `fchprom` scans a Valheim `characters_local` directory and serves character metrics at `/metrics`.
 
 ```sh
-fchprom -dir "$HOME/.config/unity3d/IronGate/Valheim/characters_local" -addr :9108
+fchprom --dir "$HOME/.config/unity3d/IronGate/Valheim/characters_local" --addr :9108
 ```
 
 Container example:
@@ -117,8 +144,11 @@ Container example:
 ```sh
 docker run --rm -p 9108:9108 \
   -v "$HOME/.config/unity3d/IronGate/Valheim/characters_local:/characters:ro" \
-  ghcr.io/lanchelms/fch-decoder-fchprom:latest -dir /characters -addr :9108
+  ghcr.io/lanchelms/fch-decoder-fchprom:latest --dir /characters --addr :9108
 ```
+
+For compatibility with the bundled Docker Compose file, `fchprom` also accepts
+legacy single-dash long flags such as `-dir /characters` and `-addr :9108`.
 
 Example metric series:
 
