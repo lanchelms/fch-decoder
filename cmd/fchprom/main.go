@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -192,11 +193,11 @@ type sample struct {
 }
 
 type cli struct {
-	Addr        string        `name:"addr" help:"Address to serve Prometheus metrics on."`
+	Addr        string        `name:"addr" default:":9108" help:"Address to serve Prometheus metrics on."`
 	Dir         string        `name:"dir" required:"" type:"path" help:"Valheim characters_local directory."`
-	MetricsPath string        `name:"metrics-path" help:"Prometheus metrics path."`
-	Workers     int           `name:"workers" help:"Maximum number of character files to decode in parallel."`
-	CacheTTL    time.Duration `name:"cache-ttl" help:"How long to reuse decoded metrics between scrapes."`
+	MetricsPath string        `name:"metrics-path" default:"/metrics" help:"Prometheus metrics path."`
+	Workers     int           `name:"workers" default:"${num_cpu}" help:"Maximum number of character files to decode in parallel."`
+	CacheTTL    time.Duration `name:"cache-ttl" default:"5s" help:"How long to reuse decoded metrics between scrapes."`
 }
 
 func main() {
@@ -226,13 +227,13 @@ func serve(cli cli) {
 }
 
 func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
-	cli := cli{
-		Addr:        ":9108",
-		MetricsPath: "/metrics",
-		Workers:     runtime.NumCPU(),
-		CacheTTL:    defaultCacheTTL,
-	}
-	parser, err := kong.New(&cli, kong.Name("fchprom"), kong.Writers(stdout, stderr))
+	var cli cli
+	parser, err := kong.New(
+		&cli,
+		kong.Name("fchprom"),
+		kong.Writers(stdout, stderr),
+		kong.Vars{"num_cpu": strconv.Itoa(runtime.NumCPU())},
+	)
 	if err != nil {
 		return cli, err
 	}
