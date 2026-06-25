@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/alecthomas/kong"
 	fch "github.com/lanchelms/fch-decoder"
@@ -18,10 +17,11 @@ type editOp interface {
 const characterEnv = "CHARACTER"
 
 type cli struct {
-	Out    string    `name:"out" type:"path" help:"Write the edited character to this path instead of updating the input file."`
-	Add    addCmd    `cmd:"" help:"Add character data."`
-	Remove removeCmd `cmd:"" help:"Remove character data."`
-	Set    setCmd    `cmd:"" help:"Set character data."`
+	Character string    `name:"character" env:"CHARACTER" required:"" type:"path" help:"Character file to edit."`
+	Out       string    `name:"out" type:"path" help:"Write the edited character to this path instead of updating the input file."`
+	Add       addCmd    `cmd:"" help:"Add character data."`
+	Remove    removeCmd `cmd:"" help:"Remove character data."`
+	Set       setCmd    `cmd:"" help:"Set character data."`
 }
 
 type addCmd struct {
@@ -187,69 +187,25 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) error {
-	character, cli, ctx, err := parseCLI(args, stdout, stderr)
+	cli, ctx, err := parseCLI(args, stdout, stderr)
 	if err != nil {
 		return err
 	}
-	runner := &editRunner{path: character, out: cli.Out, stdout: stdout}
+	runner := &editRunner{path: cli.Character, out: cli.Out, stdout: stdout}
 	return ctx.Run(runner)
 }
 
-func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (string, cli, *kong.Context, error) {
-	character, commandArgs, err := splitCharacter(args)
-	if err != nil {
-		return "", cli{}, nil, err
-	}
-
+func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, *kong.Context, error) {
 	var cli cli
 	parser, err := kong.New(&cli, kong.Name("fchedit"), kong.Writers(stdout, stderr))
 	if err != nil {
-		return "", cli, nil, err
+		return cli, nil, err
 	}
-	ctx, err := parser.Parse(commandArgs)
+	ctx, err := parser.Parse(args)
 	if err != nil {
-		return "", cli, nil, err
+		return cli, nil, err
 	}
-	return character, cli, ctx, nil
-}
-
-func splitCharacter(args []string) (string, []string, error) {
-	if character, ok := envCharacter(args); ok {
-		return character, args, nil
-	}
-	if len(args) == 0 {
-		return "", nil, fmt.Errorf("missing character file; pass it first or set %s", characterEnv)
-	}
-	if args[0] == "--help" || args[0] == "-h" {
-		return "", args, nil
-	}
-	if strings.HasPrefix(args[0], "-") {
-		return "", nil, fmt.Errorf("character file must be the first argument or %s must be set", characterEnv)
-	}
-	if isCommand(args[0]) {
-		return "", nil, fmt.Errorf("missing character file; pass it first or set %s", characterEnv)
-	}
-	return args[0], args[1:], nil
-}
-
-func envCharacter(args []string) (string, bool) {
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") && !isCommand(args[0]) {
-		return "", false
-	}
-	character, ok := os.LookupEnv(characterEnv)
-	if !ok || character == "" {
-		return "", false
-	}
-	return character, true
-}
-
-func isCommand(value string) bool {
-	switch value {
-	case "add", "remove", "set":
-		return true
-	default:
-		return false
-	}
+	return cli, ctx, nil
 }
 
 func newSetSkillLevelOp(name string, level float32) (editOp, error) {
