@@ -71,6 +71,18 @@ func (op setPlayerStatOp) apply(c *fch.Character) error {
 	return c.SetPlayerStat(op.index, op.name, op.value)
 }
 
+type statSetter func(*fch.Character, string, float32)
+
+type setStatOp struct {
+	assignment fch.StatAssignment
+	set        statSetter
+}
+
+func (op setStatOp) apply(c *fch.Character) error {
+	op.set(c, op.assignment.Name, op.assignment.Value)
+	return nil
+}
+
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -90,8 +102,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	fs.Var(opFlag{ops: &ops, parse: parseAddInventory}, "add-inventory", "add inventory item: name[,stack=n,durability=n,grid-x=n,grid-y=n,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]")
 	fs.Var(opFlag{ops: &ops, parse: parseRemoveInventory}, "remove-inventory", "remove first inventory item with exact name")
 	fs.Var(opFlag{ops: &ops, parse: parseSetSkillLevel}, "set-skill-level", "set skill level: skill-name-or-type=level")
-	fs.Var(opFlag{ops: &ops, parse: parseSetEnemyStat}, "set-enemy-stat", "set enemy stat: name=value")
-	fs.Var(opFlag{ops: &ops, parse: parseSetMaterialStat}, "set-material-stat", "set material stat: name=value")
+	fs.Var(opFlag{ops: &ops, parse: parseSetStat((*fch.Character).UpsertEnemyStat)}, "set-enemy-stat", "set enemy stat: name=value")
+	fs.Var(opFlag{ops: &ops, parse: parseSetStat((*fch.Character).UpsertMaterialStat)}, "set-material-stat", "set material stat: name=value")
 	fs.Var(opFlag{ops: &ops, parse: parseSetPlayerStat}, "set-player-stat", "set player stat: stat-name-or-index=value")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -167,22 +179,6 @@ func parseSetSkillLevel(value string) (editOp, error) {
 	return setSkillLevelOp{skillType: skillType, name: skillName, level: assignment.Value}, nil
 }
 
-func parseSetEnemyStat(value string) (editOp, error) {
-	assignment, err := fch.ParseStatAssignment(value)
-	if err != nil {
-		return nil, err
-	}
-	return setEnemyStatOp(assignment), nil
-}
-
-func parseSetMaterialStat(value string) (editOp, error) {
-	assignment, err := fch.ParseStatAssignment(value)
-	if err != nil {
-		return nil, err
-	}
-	return setMaterialStatOp(assignment), nil
-}
-
 func parseSetPlayerStat(value string) (editOp, error) {
 	assignment, err := fch.ParseStatAssignment(value)
 	if err != nil {
@@ -195,18 +191,14 @@ func parseSetPlayerStat(value string) (editOp, error) {
 	return setPlayerStatOp{index: index, name: statName, value: assignment.Value}, nil
 }
 
-type setEnemyStatOp fch.StatAssignment
-
-func (op setEnemyStatOp) apply(c *fch.Character) error {
-	c.UpsertEnemyStat(op.Name, op.Value)
-	return nil
-}
-
-type setMaterialStatOp fch.StatAssignment
-
-func (op setMaterialStatOp) apply(c *fch.Character) error {
-	c.UpsertMaterialStat(op.Name, op.Value)
-	return nil
+func parseSetStat(set statSetter) func(string) (editOp, error) {
+	return func(value string) (editOp, error) {
+		assignment, err := fch.ParseStatAssignment(value)
+		if err != nil {
+			return nil, err
+		}
+		return setStatOp{assignment: assignment, set: set}, nil
+	}
 }
 
 func writeFile(path string, data []byte, modeFrom string) error {
