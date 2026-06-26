@@ -2,6 +2,12 @@
 
 # fch-decoder
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/lanchelms/fch-decoder.svg)](https://pkg.go.dev/github.com/lanchelms/fch-decoder)
+[![Go Report Card](https://goreportcard.com/badge/github.com/lanchelms/fch-decoder)](https://goreportcard.com/report/github.com/lanchelms/fch-decoder)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/lanchelms/fch-decoder)](https://github.com/lanchelms/fch-decoder/blob/main/go.mod)
+[![Latest Release](https://img.shields.io/github/v/release/lanchelms/fch-decoder?sort=semver)](https://github.com/lanchelms/fch-decoder/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Decode, inspect, edit, and export metrics from Valheim `.fch` character files.
 Use it as a Go library, one-shot JSON dumper, character editor, or Prometheus
 scrape target.
