@@ -209,6 +209,14 @@ func currentPayloadHash(data []byte, payloadLen uint32) []byte {
 }
 
 func readMapSection(data []byte, startOffset int, payloadEnd int) (MapSection, int, error) {
+	firstSpawn, worldCount, ok := readMapPrefix(data, startOffset, payloadEnd)
+	if ok && firstSpawn <= 1 && worldCount == 0 {
+		return MapSection{
+			Offset: startOffset,
+			Raw:    append([]byte(nil), data[startOffset:startOffset+5]...),
+		}, startOffset + 5, nil
+	}
+
 	gzipOffset := bytes.Index(data[startOffset:], []byte{0x1f, 0x8b, 0x08})
 	if gzipOffset < 0 {
 		return MapSection{}, 0, fmt.Errorf("fch: gzip map block not found")
@@ -232,6 +240,15 @@ func readMapSection(data []byte, startOffset int, payloadEnd int) (MapSection, i
 	}, gzipOffset + int(compressedLen), nil
 }
 
+func readMapPrefix(data []byte, startOffset int, payloadEnd int) (byte, uint32, bool) {
+	if startOffset+5 > payloadEnd {
+		return 0, 0, false
+	}
+	firstSpawn := data[startOffset]
+	worldCount := binary.LittleEndian.Uint32(data[startOffset+1 : startOffset+5])
+	return firstSpawn, worldCount, true
+}
+
 func decodePlayer(r *reader) (PlayerData, error) {
 	var p PlayerData
 	p.Name = r.str()
@@ -247,6 +264,9 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	p.MaterialStats = readList(r, statEntry)
 	p.RecipeStats = readList(r, statEntry)
 	readPlayerState(r, &p)
+	if !p.HasPlayerData {
+		return p, nil
+	}
 	p.Inventory = readInventory(r)
 	readPlayerTail(r, &p)
 	return p, nil
@@ -289,6 +309,9 @@ func readPlayerTail(r *reader, p *PlayerData) {
 
 func readPlayerState(r *reader, p *PlayerData) {
 	p.HasPlayerData = r.bool()
+	if !p.HasPlayerData {
+		return
+	}
 	p.PlayerDataLength = r.u32()
 	p.PlayerVersion = r.u32()
 	p.MaxHealth = r.f32()

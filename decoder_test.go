@@ -267,6 +267,15 @@ func TestDecodeDetectsInvalidTrailerHash(t *testing.T) {
 	}
 }
 
+func TestDecodeMinimalCharacterWithoutPlayerData(t *testing.T) {
+	got, err := DecodeBytes(minimalCharacterBytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertMinimalCharacter(t, got)
+}
+
 func TestDecodeMalformedInputReturnsError(t *testing.T) {
 	data := make([]byte, fileOverhead+16)
 	binary.LittleEndian.PutUint32(data[:4], uint32(len(data)-fileOverhead))
@@ -359,4 +368,137 @@ func appendF32(data []byte, value float32) []byte {
 func appendString(data []byte, value string) []byte {
 	data = append(data, byte(len(value)))
 	return append(data, value...)
+}
+
+func minimalCharacterBytes() []byte {
+	payload := newWriter()
+	payload.u32(43)
+	payload.u32(105)
+	for range 105 {
+		payload.f32(0)
+	}
+	payload.bytes(minimalMapSection())
+	payload.str("Minimal Test")
+	payload.u64(987654321)
+	payload.str("")
+	payload.bool(false)
+	payload.u64(1780027200)
+	for range 6 {
+		payload.u32(0)
+	}
+	payload.bool(false)
+
+	payloadBytes := payload.data()
+	file := newWriter()
+	file.u32(uint32(len(payloadBytes)))
+	file.bytes(payloadBytes)
+	file.u32(payloadHashSize)
+	file.bytes(payloadHash(payloadBytes))
+	return file.data()
+}
+
+func minimalMapSection() []byte {
+	return []byte{1, 0, 0, 0, 0}
+}
+
+func minimalCharacter() *Character {
+	playerStats := make([]StatEntry, 105)
+	return &Character{
+		Version:         43,
+		PlayerStatCount: 105,
+		PlayerStats:     playerStats,
+		Map:             MapSection{Raw: minimalMapSection()},
+		Player: PlayerData{
+			Name:            "Minimal Test",
+			PlayerID:        987654321,
+			DateCreatedUnix: 1780027200,
+			HasPlayerData:   false,
+		},
+	}
+}
+
+func assertMinimalCharacter(t *testing.T, got *Character) {
+	t.Helper()
+
+	if got.Version != 43 {
+		t.Fatalf("Version = %d, want 43", got.Version)
+	}
+	if got.PlayerStatCount != 105 {
+		t.Fatalf("PlayerStatCount = %d, want 105", got.PlayerStatCount)
+	}
+	if len(got.PlayerStats) != 105 {
+		t.Fatalf("PlayerStats = %d, want 105", len(got.PlayerStats))
+	}
+	if got.PlayerStats[0].Name != "Deaths" || got.PlayerStats[104].Name != "UsePowerDeepNorth" {
+		t.Fatalf("bad player stat names: first=%q last=%q", got.PlayerStats[0].Name, got.PlayerStats[104].Name)
+	}
+	if got.Map.CompressedLength != 0 || got.Map.StoredLength != 0 {
+		t.Fatalf("bad map lengths: compressed=%d stored=%d", got.Map.CompressedLength, got.Map.StoredLength)
+	}
+	if string(got.Map.Raw) != string(minimalMapSection()) {
+		t.Fatalf("Map.Raw = %v, want %v", got.Map.Raw, minimalMapSection())
+	}
+	if got.Player.Name != "Minimal Test" {
+		t.Fatalf("Name = %q, want Minimal Test", got.Player.Name)
+	}
+	if got.Player.PlayerID != 987654321 {
+		t.Fatalf("PlayerID = %d, want 987654321", got.Player.PlayerID)
+	}
+	if got.Player.StartSeed != "" {
+		t.Fatalf("StartSeed = %q, want empty", got.Player.StartSeed)
+	}
+	if got.Player.UsedCheats {
+		t.Fatal("UsedCheats = true, want false")
+	}
+	if got.Player.DateCreatedUnix != 1780027200 {
+		t.Fatalf("DateCreatedUnix = %d, want 1780027200", got.Player.DateCreatedUnix)
+	}
+	if !emptyMinimalLists(got.Player) {
+		t.Fatalf("minimal player lists are not empty: %+v", got.Player)
+	}
+	if got.Player.HasPlayerData {
+		t.Fatal("HasPlayerData = true, want false")
+	}
+	if got.Player.PlayerDataLength != 0 {
+		t.Fatalf("PlayerDataLength = %d, want 0", got.Player.PlayerDataLength)
+	}
+	if got.Player.PlayerVersion != 0 || got.Player.InventoryVersion != 0 || got.Player.SkillVersion != 0 {
+		t.Fatalf("player versions = %d/%d/%d, want zero", got.Player.PlayerVersion, got.Player.InventoryVersion, got.Player.SkillVersion)
+	}
+	if got.Player.Health != 0 || got.Player.MaxHealth != 0 || got.Player.MaxStamina != 0 || got.Player.TimeSinceDeath != 0 {
+		t.Fatalf("player vitals are not zero: %+v", got.Player)
+	}
+	if got.Player.GuardianPower != (GuardianPower{}) {
+		t.Fatalf("GuardianPower = %+v, want zero", got.Player.GuardianPower)
+	}
+	if got.Trailer.Length != 64 || len(got.Trailer.Hash) != 64 {
+		t.Fatalf("bad trailer: length=%d hash=%d", got.Trailer.Length, len(got.Trailer.Hash))
+	}
+	if !got.Trailer.HashValid {
+		t.Fatal("Trailer.HashValid = false, want true")
+	}
+	if got.RemainingBytes != 0 {
+		t.Fatalf("RemainingBytes = %d, want 0", got.RemainingBytes)
+	}
+}
+
+func emptyMinimalLists(p PlayerData) bool {
+	return len(p.KnownWorlds) == 0 &&
+		len(p.KnownWorldKeys) == 0 &&
+		len(p.KnownCommands) == 0 &&
+		len(p.EnemyStats) == 0 &&
+		len(p.MaterialStats) == 0 &&
+		len(p.RecipeStats) == 0 &&
+		len(p.Inventory) == 0 &&
+		len(p.KnownRecipes) == 0 &&
+		len(p.KnownStations) == 0 &&
+		len(p.KnownMaterials) == 0 &&
+		len(p.ShownTutorials) == 0 &&
+		len(p.Uniques) == 0 &&
+		len(p.Trophies) == 0 &&
+		len(p.KnownBiomes) == 0 &&
+		len(p.PlayerKnownTexts) == 0 &&
+		len(p.Foods) == 0 &&
+		len(p.Skills) == 0 &&
+		len(p.CustomData) == 0
 }

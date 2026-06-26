@@ -94,6 +94,31 @@ func TestEncodeSyntheticCharacterDecodes(t *testing.T) {
 	}
 }
 
+func TestEncodeMinimalCharacterWithoutPlayerData(t *testing.T) {
+	encoded, err := EncodeBytes(minimalCharacter())
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeBytes(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMinimalCharacter(t, decoded)
+
+	manual := minimalCharacterBytes()
+	decoded, err = DecodeBytes(manual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err = EncodeBytes(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(encoded, manual) {
+		t.Fatalf("encoded minimal character differs from original: got %d bytes, want %d", len(encoded), len(manual))
+	}
+}
+
 func TestEncodeWritesToWriter(t *testing.T) {
 	character := syntheticCharacter()
 	want, err := EncodeBytes(character)
