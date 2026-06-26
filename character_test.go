@@ -58,6 +58,12 @@ func TestCharacterEditMethods(t *testing.T) {
 	if character.PlayerStatCount != 3 || len(character.PlayerStats) != 3 || character.PlayerStats[2].Value != 6 {
 		t.Fatalf("player stats = count %d entries %+v", character.PlayerStatCount, character.PlayerStats)
 	}
+
+	character.UpsertCustomData("fchedit.lastModified", "2026-06-26T12:00:00Z")
+	character.UpsertCustomData("fchedit.lastModified", "2026-06-26T12:01:00Z")
+	if len(character.Player.CustomData) != 1 || character.Player.CustomData[0].Value != "2026-06-26T12:01:00Z" {
+		t.Fatalf("custom data = %+v", character.Player.CustomData)
+	}
 }
 
 func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {

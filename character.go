@@ -152,6 +152,17 @@ func (c *Character) SetPlayerStat(index int, name string, value float32) error {
 	return nil
 }
 
+// UpsertCustomData updates player custom data by key or appends it.
+func (c *Character) UpsertCustomData(key string, value string) {
+	for i := range c.Player.CustomData {
+		if c.Player.CustomData[i].Key == key {
+			c.Player.CustomData[i].Value = value
+			return
+		}
+	}
+	c.Player.CustomData = append(c.Player.CustomData, TextEntry{Key: key, Value: value})
+}
+
 func upsertStat(entries *[]StatEntry, name string, value float32) {
 	for i := range *entries {
 		if strings.EqualFold((*entries)[i].Name, name) {

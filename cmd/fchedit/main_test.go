@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	fch "github.com/lanchelms/fch-decoder"
 )
@@ -79,6 +80,10 @@ func TestRunAppliesEditCommands(t *testing.T) {
 	if got := got.PlayerStats[2].Value; got != 6 {
 		t.Fatalf("Builds player stat = %v, want 6", got)
 	}
+	if count := countCustomData(got.Player.CustomData, fcheditLastModifiedKey); count != 1 {
+		t.Fatalf("%s custom data count = %d, want 1", fcheditLastModifiedKey, count)
+	}
+	requireFcheditLastModified(t, got)
 }
 
 func TestRunEditsOnlyRequestedCategory(t *testing.T) {
@@ -168,6 +173,7 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 			expected.FileLength = after.FileLength
 			expected.Player.PlayerDataLength = after.Player.PlayerDataLength
 			expected.Trailer = after.Trailer
+			expected.UpsertCustomData(fcheditLastModifiedKey, requireFcheditLastModified(t, after))
 
 			if !reflect.DeepEqual(after, expected) {
 				t.Fatal("decoded character changed outside the requested edit and encoder metadata")
@@ -191,6 +197,7 @@ func TestRunInPlace(t *testing.T) {
 	if !got.Trailer.HashValid {
 		t.Fatal("Trailer.HashValid = false, want true")
 	}
+	requireFcheditLastModified(t, got)
 }
 
 func TestRunUsesCharacterEnv(t *testing.T) {
@@ -205,6 +212,7 @@ func TestRunUsesCharacterEnv(t *testing.T) {
 	if got.PlayerStats[0].Value != 77 {
 		t.Fatalf("Deaths player stat = %v, want 77", got.PlayerStats[0].Value)
 	}
+	requireFcheditLastModified(t, got)
 }
 
 func TestRunPrefersExplicitCharacter(t *testing.T) {
@@ -224,9 +232,26 @@ func TestRunPrefersExplicitCharacter(t *testing.T) {
 	if explicitCharacter.PlayerStats[0].Value != 88 {
 		t.Fatalf("explicit character Deaths = %v, want 88", explicitCharacter.PlayerStats[0].Value)
 	}
+	requireFcheditLastModified(t, explicitCharacter)
 }
 
 func TestRunRequiresCharacter(t *testing.T) {
+	oldCharacter, hadCharacter := os.LookupEnv(characterEnv)
+	if err := os.Unsetenv(characterEnv); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if hadCharacter {
+			if err := os.Setenv(characterEnv, oldCharacter); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		if err := os.Unsetenv(characterEnv); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	err := run([]string{"set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
 	if err == nil || !strings.Contains(err.Error(), "missing character") {
 		t.Fatalf("run error = %v, want missing character", err)
@@ -265,6 +290,7 @@ func TestRunWritesInPlaceByDefault(t *testing.T) {
 	if got.PlayerStats[0].Value != 1 {
 		t.Fatalf("Deaths player stat = %v, want 1", got.PlayerStats[0].Value)
 	}
+	requireFcheditLastModified(t, got)
 }
 
 func TestRunRejectsUnknownRemove(t *testing.T) {
@@ -359,8 +385,14 @@ func TestRunDryRunDoesNotWrite(t *testing.T) {
 	if got.PlayerStats[0].Value == 3 {
 		t.Fatal("dry run wrote the character file")
 	}
+	if value, ok := customDataValue(got.Player.CustomData, fcheditLastModifiedKey); ok {
+		t.Fatalf("dry run wrote %s custom data value %q", fcheditLastModifiedKey, value)
+	}
 	if !strings.Contains(stdout.String(), "would set player-stat Deaths=3") {
 		t.Fatalf("stdout = %q, want dry-run summary", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "would set custom-data "+fcheditLastModifiedKey+"=") {
+		t.Fatalf("stdout = %q, want dry-run custom data summary", stdout.String())
 	}
 	if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
 		t.Fatalf("backup stat error = %v, want not exist", err)
@@ -632,6 +664,48 @@ func statValue(entries []fch.StatEntry, name string) float32 {
 		}
 	}
 	return 0
+}
+
+func requireFcheditLastModified(t *testing.T, character *fch.Character) string {
+	t.Helper()
+	value := requireCustomDataValue(t, character, fcheditLastModifiedKey)
+	requireTimestamp(t, fcheditLastModifiedKey, value, fcheditLastModifiedValue)
+	return value
+}
+
+func requireCustomDataValue(t *testing.T, character *fch.Character, key string) string {
+	t.Helper()
+	value, ok := customDataValue(character.Player.CustomData, key)
+	if !ok {
+		t.Fatalf("missing %s custom data", key)
+	}
+	return value
+}
+
+func requireTimestamp(t *testing.T, name string, value string, layout string) {
+	t.Helper()
+	if _, err := time.Parse(layout, value); err != nil {
+		t.Fatalf("%s = %q, want %s timestamp: %v", name, value, layout, err)
+	}
+}
+
+func customDataValue(entries []fch.TextEntry, key string) (string, bool) {
+	for _, entry := range entries {
+		if entry.Key == key {
+			return entry.Value, true
+		}
+	}
+	return "", false
+}
+
+func countCustomData(entries []fch.TextEntry, key string) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Key == key {
+			count++
+		}
+	}
+	return count
 }
 
 type ioDiscard struct{}

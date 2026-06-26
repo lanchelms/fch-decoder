@@ -7,12 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/alecthomas/kong"
 	fch "github.com/lanchelms/fch-decoder"
 )
 
-const characterEnv = "CHARACTER"
+const (
+	characterEnv             = "CHARACTER"
+	fcheditLastModifiedKey   = "fchedit.lastModified"
+	fcheditLastModifiedValue = time.RFC3339
+)
 
 type cli struct {
 	Character string    `name:"character" env:"CHARACTER" type:"path" help:"Character file to edit."`
@@ -191,6 +196,7 @@ type editRunner struct {
 	dryRun   bool
 	noBackup bool
 	stdout   io.Writer
+	now      func() time.Time
 }
 
 func (r *editRunner) listInventory(character *fch.Character) error {
@@ -234,6 +240,8 @@ func (r *editRunner) apply(edit func(*fch.Character) error, summary string) erro
 	if err := edit(character); err != nil {
 		return err
 	}
+	lastModified := r.editTime().UTC().Format(fcheditLastModifiedValue)
+	character.UpsertCustomData(fcheditLastModifiedKey, lastModified)
 	encoded, err := fch.EncodeBytes(character)
 	if err != nil {
 		return fmt.Errorf("encode character %s: %w", r.path, err)
@@ -246,6 +254,7 @@ func (r *editRunner) apply(edit func(*fch.Character) error, summary string) erro
 	inPlace := target == r.path
 	if r.dryRun {
 		fmt.Fprintf(r.stdout, "would %s\n", summary)
+		fmt.Fprintf(r.stdout, "would set custom-data %s=%s\n", fcheditLastModifiedKey, lastModified)
 		fmt.Fprintf(r.stdout, "would write %s\n", target)
 		return nil
 	}
@@ -263,6 +272,13 @@ func (r *editRunner) apply(edit func(*fch.Character) error, summary string) erro
 	fmt.Fprintln(r.stdout, summary)
 	fmt.Fprintf(r.stdout, "wrote %s\n", target)
 	return nil
+}
+
+func (r *editRunner) editTime() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
 }
 
 func backupFile(path string) (string, error) {
