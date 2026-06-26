@@ -336,10 +336,11 @@ func syntheticCharacter() *Character {
 }
 
 func syntheticMapSection() []byte {
-	var raw []byte
-	raw = appendU32(raw, 3)
-	raw = appendU32(raw, 0)
-	raw = appendU32(raw, 3)
+	w := newWriter()
+	w.u32(3)
+	w.u32(0)
+	w.u32(3)
+	raw := w.data()
 	return append(raw, 0x1f, 0x8b, 0x08)
 }
 

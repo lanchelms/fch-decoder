@@ -326,52 +326,33 @@ func FuzzDecodeEncode(f *testing.F) {
 }
 
 func TestReadInventoryCustomData(t *testing.T) {
-	var data []byte
-	data = appendU32(data, 1)
-	data = appendString(data, "Hammer")
-	data = appendU32(data, 2)
-	data = appendF32(data, 3.5)
-	data = appendU32(data, 4)
-	data = appendU32(data, 5)
-	data = append(data, 1)
-	data = appendU32(data, 6)
-	data = appendU32(data, 7)
-	data = appendU64(data, 8)
-	data = appendString(data, "Crafter")
-	data = appendU32(data, 1)
-	data = appendString(data, "custom-key")
-	data = appendString(data, "custom-value")
-	data = appendU32(data, 9)
-	data = append(data, 1)
+	encoded := newEncoder()
+	encoded.inventory([]Item{{
+		Name:        "Hammer",
+		Stack:       2,
+		Durability:  3.5,
+		GridX:       4,
+		GridY:       5,
+		Equipped:    true,
+		Quality:     6,
+		Variant:     7,
+		CrafterID:   8,
+		CrafterName: "Crafter",
+		CustomData: []TextEntry{{
+			Key:   "custom-key",
+			Value: "custom-value",
+		}},
+		WorldLevel: 9,
+		PickedUp:   true,
+	}})
 
-	got := readInventory(newReader(data))
+	got := readInventory(newReader(encoded.w.data()))
 	if len(got) != 1 {
 		t.Fatalf("Inventory = %d, want 1", len(got))
 	}
 	if got := got[0].CustomData; len(got) != 1 || got[0] != (TextEntry{Key: "custom-key", Value: "custom-value"}) {
 		t.Fatalf("Inventory[0].CustomData = %+v", got)
 	}
-}
-
-func appendU32(data []byte, value uint32) []byte {
-	var b [4]byte
-	binary.LittleEndian.PutUint32(b[:], value)
-	return append(data, b[:]...)
-}
-
-func appendU64(data []byte, value uint64) []byte {
-	var b [8]byte
-	binary.LittleEndian.PutUint64(b[:], value)
-	return append(data, b[:]...)
-}
-
-func appendF32(data []byte, value float32) []byte {
-	return appendU32(data, math.Float32bits(value))
-}
-
-func appendString(data []byte, value string) []byte {
-	data = append(data, byte(len(value)))
-	return append(data, value...)
 }
 
 func minimalMapSection() []byte {
