@@ -142,6 +142,8 @@ To discover editable names:
 ```sh
 fchedit list skills
 fchedit list player-stats
+fchedit list items
+fchedit list items --all
 fchedit list inventory
 ```
 
@@ -149,9 +151,15 @@ Inventory additions accept
 `name[,stack=n,durability=n,pos=x:y,equipped=bool,quality=n,variant=n,crafter-id=n,crafter-name=s,world-level=n,picked-up=bool]`.
 Numeric fields are validated before writing. Skill levels must be between 0 and
 100, stat counters must be nonnegative finite numbers, inventory stack and
-quality must be at least 1, and item/stat names must not be empty. Inventory
-items default to `stack=1`, `durability=100`, `quality=1`, and
-`picked-up=true`. If `pos` is omitted, fchedit uses the next empty normal
+quality must fit the selected item, and the leading item/stat/skill name must
+not be blank.
+Inventory item names must match Valheim ObjectDB prefab names embedded in the
+binary; use `fchedit list items` to discover valid names, default durability,
+max quality, and vanilla max stack size. Internal creature/effect equipment is
+hidden unless `fchedit list items --all` is used. Inventory items default to
+`stack=1`, full durability for the selected quality, `quality=1`, and
+`picked-up=true`. Stack size is only required to be at least 1 so modded larger
+stacks can be written. If `pos` is omitted, fchedit uses the next empty normal
 inventory slot. If `pos` is supplied, both coordinates must be specified as
 `x:y`; an occupied target slot is overwritten.
 

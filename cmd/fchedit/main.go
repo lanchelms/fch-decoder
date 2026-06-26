@@ -158,6 +158,7 @@ func (cmd *setPlayerStatCmd) Run(r *editRunner) error {
 type listCmd struct {
 	Skills     listSkillsCmd     `cmd:"" help:"List known skill names."`
 	PlayerStat listPlayerStatCmd `cmd:"" name:"player-stats" help:"List known player stat names."`
+	Items      listItemsCmd      `cmd:"" help:"List valid inventory item prefab names."`
 	Inventory  listInventoryCmd  `cmd:"" help:"List inventory items in the character file."`
 }
 
@@ -176,6 +177,26 @@ func (cmd *listPlayerStatCmd) Run(r *editRunner) error {
 	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
 	for i, name := range fch.PlayerStatNames() {
 		fmt.Fprintf(w, "%d\t%s\n", i, name)
+	}
+	return w.Flush()
+}
+
+type listItemsCmd struct {
+	All bool `name:"all" short:"a" help:"Include internal ObjectDB item prefabs that are not advisory-valid inventory items."`
+}
+
+func (cmd *listItemsCmd) Run(r *editRunner) error {
+	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
+	for _, item := range fch.Items().List() {
+		if !cmd.All && !item.InventoryValid {
+			continue
+		}
+		fmt.Fprintf(w, "%s\tdurability=%v\tmax-quality=%d\tmax-stack=%d\n",
+			item.Name,
+			item.Durability(1),
+			item.MaxQuality,
+			item.MaxStack,
+		)
 	}
 	return w.Flush()
 }
@@ -356,6 +377,7 @@ Examples:
   fchedit --character character.fch --dry-run set player-stat Deaths 0
   fchedit --character character.fch add inventory 'Wood,stack=50,quality=1'
   fchedit list skills
+  fchedit list items
   fchedit list player-stats`),
 		kong.Writers(stdout, stderr),
 	)

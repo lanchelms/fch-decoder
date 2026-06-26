@@ -3,12 +3,12 @@ package main
 import "testing"
 
 func TestParseInventoryItem(t *testing.T) {
-	item, positioned, err := parseInventoryItem("Wood,stack=50,durability=0.75,pos=1:2,equipped=true,quality=3,variant=4,crafter-id=123,crafter-name=Tester,world-level=2,picked-up=false")
+	item, positioned, err := parseInventoryItem("SwordIron,stack=1,durability=0.75,pos=1:2,equipped=true,quality=3,variant=4,crafter-id=123,crafter-name=Tester,world-level=2,picked-up=false")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item.Name != "Wood" ||
-		item.Stack != 50 ||
+	if item.Name != "SwordIron" ||
+		item.Stack != 1 ||
 		item.Durability != 0.75 ||
 		item.GridX != 1 ||
 		item.GridY != 2 ||
@@ -34,9 +34,40 @@ func TestParseInventoryItemDefaults(t *testing.T) {
 	}
 }
 
+func TestParseInventoryItemQualityDefaultDurability(t *testing.T) {
+	item, _, err := parseInventoryItem("SwordIron,quality=3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Durability != 300 {
+		t.Fatalf("durability = %v, want max durability for quality 3", item.Durability)
+	}
+}
+
+func TestParseInventoryItemExplicitDurability(t *testing.T) {
+	item, _, err := parseInventoryItem("SwordIron,durability=12,quality=3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Durability != 12 {
+		t.Fatalf("durability = %v, want explicit durability", item.Durability)
+	}
+}
+
+func TestParseInventoryItemAllowsModdedStacks(t *testing.T) {
+	item, _, err := parseInventoryItem("Wood,stack=150")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Stack != 150 {
+		t.Fatalf("stack = %d, want modded stack size", item.Stack)
+	}
+}
+
 func TestParseInventoryItemRejectsUnsafeValues(t *testing.T) {
 	tests := []string{
 		"",
+		"NoSuchItem",
 		"Wood,stack=0",
 		"Wood,durability=-1",
 		"Wood,durability=NaN",
@@ -47,6 +78,7 @@ func TestParseInventoryItemRejectsUnsafeValues(t *testing.T) {
 		"Wood,pos=:0",
 		"Wood,pos=0:0:0",
 		"Wood,quality=0",
+		"Wood,quality=2",
 		"Wood,variant=-1",
 	}
 	for _, value := range tests {

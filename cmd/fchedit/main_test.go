@@ -21,7 +21,7 @@ func TestRunAppliesEditCommands(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	commands := [][]string{
-		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=50,pos=1:2,quality=3,crafter-name=Tester"},
+		{"--character", in, "--out", out, "add", "inventory", "Wood,stack=50,pos=1:2,quality=1,crafter-name=Tester"},
 		{"--character", out, "add", "inventory", "Stone,stack=25,pos=2:2"},
 		{"--character", out, "remove", "inventory", "Wood"},
 		{"--character", out, "set", "skill", "Swords", "44.5"},
@@ -458,6 +458,28 @@ func TestRunListsWithoutCharacter(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Run") {
 		t.Fatalf("stdout = %q, want skills", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := run([]string{"list", "items"}, &stdout, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "SwordIron") || !strings.Contains(stdout.String(), "max-quality=4") {
+		t.Fatalf("stdout = %q, want item metadata", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "inventory-valid") {
+		t.Fatalf("stdout = %q, want inventory-valid hidden", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "Abomination_attack1") {
+		t.Fatalf("stdout = %q, want internal items hidden", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := run([]string{"list", "items", "--all"}, &stdout, ioDiscard{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "Abomination_attack1") || strings.Contains(stdout.String(), "inventory-valid") {
+		t.Fatalf("stdout = %q, want all item metadata", stdout.String())
 	}
 }
 

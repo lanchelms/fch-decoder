@@ -22,9 +22,11 @@ type playerStatRef struct {
 }
 
 type inventoryItemParser struct {
-	parts      []string
-	item       fch.Item
-	positioned bool
+	parts         []string
+	metadata      fch.ItemMetadata
+	item          fch.Item
+	positioned    bool
+	durabilitySet bool
 }
 
 func parseInventoryItem(value string) (fch.Item, bool, error) {
@@ -55,10 +57,15 @@ func (p *inventoryItemParser) parseName() error {
 	if name == "" {
 		return fmt.Errorf("inventory item name is required")
 	}
+	metadata, ok := fch.Items().Lookup(name)
+	if !ok {
+		return fmt.Errorf("unknown inventory item %q", name)
+	}
+	p.metadata = metadata
 	p.item = fch.Item{
-		Name:       name,
+		Name:       metadata.Name,
 		Stack:      1,
-		Durability: 100,
+		Durability: metadata.Durability(1),
 		Quality:    1,
 		PickedUp:   true,
 	}
@@ -100,6 +107,7 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 		if err == nil && p.item.Durability < 0 {
 			return fmt.Errorf("must be nonnegative")
 		}
+		p.durabilitySet = err == nil
 	case "pos":
 		err = p.setPosition(raw)
 	case "equipped":
@@ -108,6 +116,12 @@ func (p *inventoryItemParser) setField(key string, raw string) error {
 		p.item.Quality, err = parseInt32(raw)
 		if err == nil && p.item.Quality < 1 {
 			return fmt.Errorf("must be at least 1")
+		}
+		if err == nil && p.item.Quality > p.metadata.MaxQuality {
+			return fmt.Errorf("must be at most %d for %s", p.metadata.MaxQuality, p.metadata.Name)
+		}
+		if err == nil && !p.durabilitySet {
+			p.item.Durability = p.metadata.Durability(p.item.Quality)
 		}
 	case "variant":
 		p.item.Variant, err = parseInt32(raw)
