@@ -86,7 +86,7 @@ func (cmd *setSkillCmd) Run(r *editRunner) error {
 		return err
 	}
 	return r.apply(func(c *fch.Character) error {
-		c.SetSkillLevel(skill.skillType, skill.name, level)
+		c.SetSkill(skill.skillType, level)
 		return nil
 	}, fmt.Sprintf("set skill %s=%v", skill.name, level))
 }

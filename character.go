@@ -2,6 +2,7 @@ package fch
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -77,18 +78,21 @@ func (c *Character) RemoveInventoryItem(name string) error {
 	return fmt.Errorf("inventory item %q not found", name)
 }
 
-// SetSkillLevel updates an existing skill level or appends a new skill record.
-func (c *Character) SetSkillLevel(skillType int32, name string, level float32) {
+// SetSkill updates an existing skill or appends a new skill record.
+func (c *Character) SetSkill(skillType int32, level float32) {
+	displayLevel := int32(math.Floor(float64(level)))
 	for i := range c.Player.Skills {
 		if c.Player.Skills[i].Type == skillType {
 			c.Player.Skills[i].Level = level
+			c.Player.Skills[i].DisplayLevel = displayLevel
 			return
 		}
 	}
 	c.Player.Skills = append(c.Player.Skills, Skill{
-		Type:  skillType,
-		Name:  name,
-		Level: level,
+		Type:         skillType,
+		Name:         skillName(skillType),
+		Level:        level,
+		DisplayLevel: displayLevel,
 	})
 }
 

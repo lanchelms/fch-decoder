@@ -30,9 +30,11 @@ func TestCharacterEditMethods(t *testing.T) {
 		t.Fatalf("placed item = %+v, want Feathers at 1,0", item)
 	}
 
-	character.SetSkillLevel(102, "Run", 22)
-	character.SetSkillLevel(102, "Run", 23)
-	if len(character.Player.Skills) != 1 || character.Player.Skills[0].Level != 23 {
+	character.SetSkill(102, 22.75)
+	character.SetSkill(102, 23.5)
+	if len(character.Player.Skills) != 1 ||
+		character.Player.Skills[0].Level != 23.5 ||
+		character.Player.Skills[0].DisplayLevel != 23 {
 		t.Fatalf("skills = %+v", character.Player.Skills)
 	}
 

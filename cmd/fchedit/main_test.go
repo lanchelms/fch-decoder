@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -75,6 +76,101 @@ func TestRunAppliesEditCommands(t *testing.T) {
 	}
 	if got := got.PlayerStats[2].Value; got != 6 {
 		t.Fatalf("Builds player stat = %v, want 6", got)
+	}
+}
+
+func TestRunEditsOnlyRequestedCategory(t *testing.T) {
+	tests := []struct {
+		name   string
+		args   []string
+		expect func(*fch.Character)
+	}{
+		{
+			name: "add inventory",
+			args: []string{"add", "inventory", "Needle,stack=3,pos=4:1"},
+			expect: func(character *fch.Character) {
+				character.Player.Inventory = append(character.Player.Inventory, fch.Item{
+					Name:       "Needle",
+					Stack:      3,
+					Durability: 100,
+					GridX:      4,
+					GridY:      1,
+					Quality:    1,
+					CustomData: []fch.TextEntry{},
+					PickedUp:   true,
+				})
+			},
+		},
+		{
+			name: "remove inventory",
+			args: []string{"remove", "inventory", "Hammer"},
+			expect: func(character *fch.Character) {
+				if err := character.RemoveInventoryItem("Hammer"); err != nil {
+					panic(err)
+				}
+			},
+		},
+		{
+			name: "set skill",
+			args: []string{"set", "skill", "Run", "22"},
+			expect: func(character *fch.Character) {
+				character.SetSkill(102, 22)
+			},
+		},
+		{
+			name: "set enemy",
+			args: []string{"set", "enemy", "$enemy_greydwarf", "123"},
+			expect: func(character *fch.Character) {
+				character.UpsertEnemyStat("$enemy_greydwarf", 123)
+			},
+		},
+		{
+			name: "set material",
+			args: []string{"set", "material", "$item_wood", "777"},
+			expect: func(character *fch.Character) {
+				character.UpsertMaterialStat("$item_wood", 777)
+			},
+		},
+		{
+			name: "set player stat",
+			args: []string{"set", "player-stat", "Deaths", "5"},
+			expect: func(character *fch.Character) {
+				if err := character.SetPlayerStat(0, "Deaths", 5); err != nil {
+					panic(err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := copyFixture(t, "Steam_333333_tugen.fch")
+			before := decodeFile(t, in)
+			oldHash := append([]byte(nil), before.Trailer.Hash...)
+
+			args := append([]string{"--character", in, "--no-backup"}, tt.args...)
+			if err := run(args, ioDiscard{}, ioDiscard{}); err != nil {
+				t.Fatalf("run(%v) error = %v", args, err)
+			}
+			after := decodeFile(t, in)
+
+			if !after.Trailer.HashValid {
+				t.Fatal("Trailer.HashValid = false, want true")
+			}
+			if bytes.Equal(after.Trailer.Hash, oldHash) {
+				t.Fatal("Trailer.Hash was not recalculated")
+			}
+
+			expected := before
+			tt.expect(expected)
+			expected.FileLength = after.FileLength
+			expected.Player.PlayerDataLength = after.Player.PlayerDataLength
+			expected.Trailer = after.Trailer
+
+			if !reflect.DeepEqual(after, expected) {
+				t.Fatal("decoded character changed outside the requested edit and encoder metadata")
+			}
+		})
 	}
 }
 
