@@ -86,6 +86,50 @@ func TestRunAppliesEditCommands(t *testing.T) {
 	requireFcheditLastModified(t, got)
 }
 
+func TestRunShortFlags(t *testing.T) {
+	t.Run("character and out", func(t *testing.T) {
+		in := copyFixture(t, "Steam_333333_tugen.fch")
+		out := filepath.Join(t.TempDir(), "edited.fch")
+
+		if err := run([]string{"-c", in, "-o", out, "set", "player-stat", "Deaths", "4"}, ioDiscard{}, ioDiscard{}); err != nil {
+			t.Fatal(err)
+		}
+
+		got := decodeFile(t, out)
+		if got.PlayerStats[0].Value != 4 {
+			t.Fatalf("Deaths player stat = %v, want 4", got.PlayerStats[0].Value)
+		}
+		requireFcheditLastModified(t, got)
+	})
+
+	t.Run("no backup", func(t *testing.T) {
+		in := copyFixture(t, "Steam_333333_tugen.fch")
+
+		if err := run([]string{"-c", in, "-n", "set", "player-stat", "Deaths", "5"}, ioDiscard{}, ioDiscard{}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
+			t.Fatalf("backup stat error = %v, want not exist", err)
+		}
+	})
+
+	t.Run("dry run", func(t *testing.T) {
+		in := copyFixture(t, "Steam_333333_tugen.fch")
+
+		var stdout bytes.Buffer
+		if err := run([]string{"-c", in, "-d", "set", "player-stat", "Deaths", "6"}, &stdout, ioDiscard{}); err != nil {
+			t.Fatal(err)
+		}
+		got := decodeFile(t, in)
+		if got.PlayerStats[0].Value == 6 {
+			t.Fatal("dry run wrote the character file")
+		}
+		if !strings.Contains(stdout.String(), "would set player-stat Deaths=6") {
+			t.Fatalf("stdout = %q, want dry-run summary", stdout.String())
+		}
+	})
+}
+
 func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 	tests := []struct {
 		name   string

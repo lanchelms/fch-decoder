@@ -23,6 +23,22 @@ func TestRunDumpsCharacter(t *testing.T) {
 	}
 }
 
+func TestRunDumpsCharacterShortFlag(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"-c", filepath.Join("..", "..", "testdata", "Steam_333333_tugen.fch")}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run error = %v, stderr = %s", err, stderr.String())
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out["player"] == nil {
+		t.Fatalf("output has no player: %s", stdout.String())
+	}
+}
+
 func TestRunUsesCharacterEnv(t *testing.T) {
 	t.Setenv("CHARACTER", filepath.Join("..", "..", "testdata", "Steam_333333_tugen.fch"))
 

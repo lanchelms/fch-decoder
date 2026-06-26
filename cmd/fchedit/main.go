@@ -20,10 +20,10 @@ const (
 )
 
 type cli struct {
-	Character string    `name:"character" env:"CHARACTER" type:"path" help:"Character file to edit."`
-	Out       string    `name:"out" type:"path" help:"Write the edited character to this path instead of updating the input file."`
-	DryRun    bool      `name:"dry-run" help:"Decode, validate, and summarize the edit without writing a file."`
-	NoBackup  bool      `name:"no-backup" help:"Do not create a backup before editing a character in place."`
+	Character string    `name:"character" short:"c" env:"CHARACTER" type:"path" help:"Character file to edit."`
+	Out       string    `name:"out" short:"o" type:"path" help:"Write the edited character to this path instead of updating the input file."`
+	DryRun    bool      `name:"dry-run" short:"d" help:"Decode, validate, and summarize the edit without writing a file."`
+	NoBackup  bool      `name:"no-backup" short:"n" help:"Do not create a backup before editing a character in place."`
 	Add       addCmd    `cmd:"" help:"Add character data."`
 	Remove    removeCmd `cmd:"" help:"Remove character data."`
 	Set       setCmd    `cmd:"" help:"Set character data."`

@@ -11,7 +11,7 @@ import (
 )
 
 type cli struct {
-	Character string `name:"character" env:"CHARACTER" required:"" type:"path" help:"Character file to dump."`
+	Character string `name:"character" short:"c" env:"CHARACTER" required:"" type:"path" help:"Character file to dump."`
 }
 
 func main() {
