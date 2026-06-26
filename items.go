@@ -60,12 +60,13 @@ func (c *ItemCatalog) Names() []string {
 // ItemMetadata describes a Valheim ObjectDB item prefab that can be written to
 // inventory records.
 type ItemMetadata struct {
-	Name           string  `json:"name"`
-	InventoryValid bool    `json:"inventoryValid"`
-	BaseDurability float32 `json:"baseDurability"`
-	DurabilityStep float32 `json:"durabilityStep"`
-	MaxQuality     int32   `json:"maxQuality"`
-	MaxStack       int32   `json:"maxStack"`
+	Name           string   `json:"name"`
+	InventoryValid bool     `json:"inventoryValid"`
+	Recipes        []string `json:"recipes,omitempty"`
+	BaseDurability float32  `json:"baseDurability"`
+	DurabilityStep float32  `json:"durabilityStep"`
+	MaxQuality     int32    `json:"maxQuality"`
+	MaxStack       int32    `json:"maxStack"`
 }
 
 // Durability returns the default full durability for the requested quality.
@@ -113,37 +114,46 @@ func itemRowCount(data string) int {
 
 func parseItemRow(line string) (ItemMetadata, error) {
 	fields := strings.Split(line, "\t")
-	if len(fields) != 6 {
-		return ItemMetadata{}, fmt.Errorf("got %d fields, want 6", len(fields))
+	if len(fields) != 7 {
+		return ItemMetadata{}, fmt.Errorf("got %d fields, want 7", len(fields))
 	}
 	inventoryValid, err := strconv.ParseBool(fields[1])
 	if err != nil {
 		return ItemMetadata{}, fmt.Errorf("inventory valid: %w", err)
 	}
-	baseDurability, err := parseCatalogFloat32(fields[2])
+	recipes := parseItemRecipes(fields[2])
+	baseDurability, err := parseCatalogFloat32(fields[3])
 	if err != nil {
 		return ItemMetadata{}, fmt.Errorf("base durability: %w", err)
 	}
-	durabilityStep, err := parseCatalogFloat32(fields[3])
+	durabilityStep, err := parseCatalogFloat32(fields[4])
 	if err != nil {
 		return ItemMetadata{}, fmt.Errorf("durability step: %w", err)
 	}
-	maxQuality, err := parseCatalogInt32(fields[4])
+	maxQuality, err := parseCatalogInt32(fields[5])
 	if err != nil {
 		return ItemMetadata{}, fmt.Errorf("max quality: %w", err)
 	}
-	maxStack, err := parseCatalogInt32(fields[5])
+	maxStack, err := parseCatalogInt32(fields[6])
 	if err != nil {
 		return ItemMetadata{}, fmt.Errorf("max stack: %w", err)
 	}
 	return ItemMetadata{
 		Name:           fields[0],
 		InventoryValid: inventoryValid,
+		Recipes:        recipes,
 		BaseDurability: baseDurability,
 		DurabilityStep: durabilityStep,
 		MaxQuality:     maxQuality,
 		MaxStack:       maxStack,
 	}, nil
+}
+
+func parseItemRecipes(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 func parseCatalogFloat32(value string) (float32, error) {

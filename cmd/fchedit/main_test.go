@@ -86,6 +86,26 @@ func TestRunAppliesEditCommands(t *testing.T) {
 	requireFcheditLastModified(t, got)
 }
 
+func TestRunCreditsRecipeInventoryItem(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	out := filepath.Join(t.TempDir(), "edited.fch")
+
+	var stdout, stderr bytes.Buffer
+	args := []string{"--character", in, "--out", out, "add", "inventory", "SwordIron,pos=3:2"}
+	if err := run(args, &stdout, &stderr); err != nil {
+		t.Fatalf("run(%v) error = %v, stderr = %s", args, err, stderr.String())
+	}
+
+	got := decodeFile(t, out)
+	item := findItem(got.Player.Inventory, "SwordIron")
+	if item == nil {
+		t.Fatal("SwordIron inventory item was not added")
+	}
+	if item.CrafterID != got.Player.PlayerID || item.CrafterName != got.Player.Name || !item.PickedUp {
+		t.Fatalf("SwordIron item = %+v, want player crafter %d/%q and picked up", *item, got.Player.PlayerID, got.Player.Name)
+	}
+}
+
 func TestRunShortFlags(t *testing.T) {
 	t.Run("character and out", func(t *testing.T) {
 		in := copyFixture(t, "Steam_333333_tugen.fch")

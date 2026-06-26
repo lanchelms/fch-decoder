@@ -1,13 +1,16 @@
 package fch
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestItemMetadataLookup(t *testing.T) {
 	item, ok := Items().Lookup("SwordIron")
 	if !ok {
 		t.Fatal("Items().Lookup(SwordIron) ok = false")
 	}
-	if !item.InventoryValid || item.BaseDurability != 200 || item.DurabilityStep != 50 || item.MaxQuality != 4 || item.MaxStack != 1 {
+	if !item.InventoryValid || !slices.Equal(item.Recipes, []string{"Recipe_SwordIron"}) || item.BaseDurability != 200 || item.DurabilityStep != 50 || item.MaxQuality != 4 || item.MaxStack != 1 {
 		t.Fatalf("SwordIron metadata = %+v", item)
 	}
 	if got := item.Durability(3); got != 300 {
@@ -22,6 +25,19 @@ func TestItemMetadataInventoryValid(t *testing.T) {
 	}
 	if item.InventoryValid {
 		t.Fatalf("Abomination_attack1 InventoryValid = true, want false")
+	}
+	if len(item.Recipes) != 0 {
+		t.Fatalf("Abomination_attack1 Recipes = %v, want none", item.Recipes)
+	}
+}
+
+func TestItemMetadataRecipes(t *testing.T) {
+	item, ok := Items().Lookup("Bronze")
+	if !ok {
+		t.Fatal("Items().Lookup(Bronze) ok = false")
+	}
+	if !slices.Equal(item.Recipes, []string{"Recipe_Bronze", "Recipe_Bronze5"}) {
+		t.Fatalf("Bronze recipes = %v, want both bronze recipes", item.Recipes)
 	}
 }
 

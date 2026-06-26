@@ -60,6 +60,18 @@ func (c *Character) AddInventoryItem(item Item) {
 	c.Player.Inventory = append(c.Player.Inventory, item)
 }
 
+// CreditCraftedItem credits character as crafter when item is a recipe output
+// and does not already have explicit crafter metadata.
+func (c *Character) CreditCraftedItem(item Item) Item {
+	metadata, ok := Items().Lookup(item.Name)
+	if !ok || len(metadata.Recipes) == 0 || item.CrafterID != 0 || item.CrafterName != "" {
+		return item
+	}
+	item.CrafterID = c.Player.PlayerID
+	item.CrafterName = c.Player.Name
+	return item
+}
+
 // PutInventoryItem adds item unless its grid slot is occupied. When replace is
 // true, the item at the same grid slot is overwritten.
 func (c *Character) PutInventoryItem(item Item, replace bool) error {

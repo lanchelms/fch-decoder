@@ -79,6 +79,25 @@ func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {
 	}
 }
 
+func TestCreditCraftedItem(t *testing.T) {
+	character := &Character{Player: PlayerData{PlayerID: 123, Name: "Tester"}}
+
+	item := character.CreditCraftedItem(Item{Name: "SwordIron"})
+	if item.CrafterID != 123 || item.CrafterName != "Tester" {
+		t.Fatalf("crafted item = %+v, want player crafter", item)
+	}
+
+	item = character.CreditCraftedItem(Item{Name: "Wood"})
+	if item.CrafterID != 0 || item.CrafterName != "" {
+		t.Fatalf("non-crafted item = %+v, want no crafter", item)
+	}
+
+	item = character.CreditCraftedItem(Item{Name: "SwordIron", CrafterID: 456, CrafterName: "Other"})
+	if item.CrafterID != 456 || item.CrafterName != "Other" {
+		t.Fatalf("explicit crafter item = %+v, want preserved crafter", item)
+	}
+}
+
 func TestCharacterValidate(t *testing.T) {
 	character := validCharacter()
 

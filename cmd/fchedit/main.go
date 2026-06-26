@@ -44,6 +44,7 @@ func (cmd *addInventoryCmd) Run(r *editRunner) error {
 		return err
 	}
 	return r.apply(func(c *fch.Character) error {
+		item = c.CreditCraftedItem(item)
 		if positioned {
 			return c.PutInventoryItem(item, true)
 		}
