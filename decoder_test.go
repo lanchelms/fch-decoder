@@ -267,7 +267,7 @@ func TestDecodeDetectsInvalidTrailerHash(t *testing.T) {
 	}
 }
 
-func TestDecodeMinimalCharacterFixtureWithoutPlayerData(t *testing.T) {
+func TestDecodeMinimalCharacterFixtureWithoutPlayer(t *testing.T) {
 	fixture, err := os.ReadFile(filepath.Join("testdata", "decoder", "minimal_no_player_data.fch"))
 	if err != nil {
 		t.Fatal(err)
@@ -424,7 +424,7 @@ func assertMinimalCharacter(t *testing.T, got *Character, name string, playerID 
 	}
 }
 
-func emptyMinimalLists(p PlayerData) bool {
+func emptyMinimalLists(p Player) bool {
 	return len(p.KnownWorlds) == 0 &&
 		len(p.KnownWorldKeys) == 0 &&
 		len(p.KnownCommands) == 0 &&

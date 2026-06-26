@@ -68,7 +68,7 @@ func (e *encoder) payload(c *Character) error {
 	return e.player(c.Player)
 }
 
-func (e *encoder) player(p PlayerData) error {
+func (e *encoder) player(p Player) error {
 	e.w.str(p.Name)
 	e.w.u64(p.PlayerID)
 	e.w.str(p.StartSeed)
@@ -84,7 +84,7 @@ func (e *encoder) player(p PlayerData) error {
 	return e.playerData(p)
 }
 
-func (e *encoder) playerData(p PlayerData) error {
+func (e *encoder) playerData(p Player) error {
 	e.w.bool(p.HasPlayerData)
 	if !p.HasPlayerData {
 		return nil
@@ -103,7 +103,7 @@ func (e *encoder) playerData(p PlayerData) error {
 	return nil
 }
 
-func (e *encoder) playerDataPayload(p PlayerData) error {
+func (e *encoder) playerDataPayload(p Player) error {
 	e.w.u32(p.PlayerVersion)
 	e.w.f32(p.MaxHealth)
 	e.w.f32(p.Health)
@@ -120,7 +120,7 @@ func (e *encoder) inventory(items []Item) {
 	writeList(e.w, items, e.item)
 }
 
-func (e *encoder) playerTail(p PlayerData) error {
+func (e *encoder) playerTail(p Player) error {
 	writeList(e.w, p.KnownRecipes, e.str)
 	writeList(e.w, p.KnownStations, e.station)
 	writeList(e.w, p.KnownMaterials, e.str)

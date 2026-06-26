@@ -24,7 +24,7 @@ type Character struct {
 	PlayerStatCount uint32      `json:"playerStatCount"`
 	PlayerStats     []StatEntry `json:"playerStats,omitempty"`
 	Map             MapSection  `json:"map"`
-	Player          PlayerData  `json:"player"`
+	Player          Player      `json:"player"`
 	Trailer         Trailer     `json:"trailer"`
 	RemainingBytes  int         `json:"remainingBytes"`
 }

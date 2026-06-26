@@ -583,7 +583,7 @@ func TestRunListsInventory(t *testing.T) {
 func TestListInventoryAlignsColumns(t *testing.T) {
 	runner := &editRunner{stdout: &bytes.Buffer{}}
 	character := &fch.Character{
-		Player: fch.PlayerData{
+		Player: fch.Player{
 			Inventory: []fch.Item{
 				{Name: "Wood", Stack: 1, Quality: 1, Durability: 1},
 				{Name: "ReallyLongInventoryItemName", Stack: 2, Quality: 3, Durability: 4},

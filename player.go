@@ -2,7 +2,7 @@ package fch
 
 import "time"
 
-type PlayerData struct {
+type Player struct {
 	Name             string        `json:"name"`
 	PlayerID         uint64        `json:"playerId"`
 	StartSeed        string        `json:"startSeed"`
@@ -47,8 +47,8 @@ type PlayerData struct {
 	tailFloatCount   int
 }
 
-func NewPlayer(name string, playerID uint64) PlayerData {
-	return PlayerData{
+func NewPlayer(name string, playerID uint64) Player {
+	return Player{
 		Name:             name,
 		PlayerID:         playerID,
 		DateCreatedUnix:  time.Now().Unix(),

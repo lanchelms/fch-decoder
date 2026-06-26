@@ -166,7 +166,7 @@ func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {
 }
 
 func TestCreditCraftedItem(t *testing.T) {
-	character := &Character{Player: PlayerData{PlayerID: 123, Name: "Tester"}}
+	character := &Character{Player: Player{PlayerID: 123, Name: "Tester"}}
 
 	item := character.CreditCraftedItem(Item{Name: "SwordIron"})
 	if item.CrafterID != 123 || item.CrafterName != "Tester" {

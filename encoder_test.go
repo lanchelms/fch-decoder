@@ -275,7 +275,7 @@ func syntheticCharacter() *Character {
 			{Name: "CraftingStationUses", Value: 2.5},
 		},
 		Map: MapSection{Raw: syntheticMapSection()},
-		Player: PlayerData{
+		Player: Player{
 			Name:            "Encoder Test",
 			PlayerID:        123456,
 			StartSeed:       "seed",

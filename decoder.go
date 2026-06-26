@@ -204,8 +204,8 @@ func readMapPrefix(data []byte, startOffset int, payloadEnd int) (byte, uint32, 
 	return firstSpawn, worldCount, true
 }
 
-func decodePlayer(r *reader) (PlayerData, error) {
-	var p PlayerData
+func decodePlayer(r *reader) (Player, error) {
+	var p Player
 	p.Name = r.str()
 	p.PlayerID = r.u64()
 	p.StartSeed = r.str()
@@ -227,7 +227,7 @@ func decodePlayer(r *reader) (PlayerData, error) {
 	return p, nil
 }
 
-func readPlayerTail(r *reader, p *PlayerData) {
+func readPlayerTail(r *reader, p *Player) {
 	p.KnownRecipes = readList(r, str)
 	p.KnownStations = readList(r, station)
 	p.KnownMaterials = readList(r, str)
@@ -262,7 +262,7 @@ func readPlayerTail(r *reader, p *PlayerData) {
 	}
 }
 
-func readPlayerState(r *reader, p *PlayerData) {
+func readPlayerState(r *reader, p *Player) {
 	p.HasPlayerData = r.bool()
 	if !p.HasPlayerData {
 		return
