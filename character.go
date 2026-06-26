@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"time"
 )
 
 const (
@@ -31,27 +30,14 @@ type Character struct {
 }
 
 func NewCharacter(name string, playerID uint64) *Character {
-	playerStats := newPlayerStats()
+	playerStats := NewPlayerStats()
 	return &Character{
 		Version:         supportedCharacterVersion,
 		PlayerStatCount: uint32(len(playerStats)),
 		PlayerStats:     playerStats,
 		Map:             MapSection{Raw: []byte{1, 0, 0, 0, 0}},
-		Player: PlayerData{
-			Name:            name,
-			PlayerID:        playerID,
-			DateCreatedUnix: time.Now().Unix(),
-			HasPlayerData:   false,
-		},
+		Player:          NewPlayer(name, playerID),
 	}
-}
-
-func newPlayerStats() []StatEntry {
-	stats := make([]StatEntry, len(playerStatNames))
-	for i, name := range playerStatNames {
-		stats[i].Name = name
-	}
-	return stats
 }
 
 // Validate verifies that the character matches the file shape this package can safely edit.

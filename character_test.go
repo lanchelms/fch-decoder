@@ -30,8 +30,17 @@ func TestNewCharacter(t *testing.T) {
 	if character.Player.DateCreatedUnix < before || character.Player.DateCreatedUnix > after {
 		t.Fatalf("DateCreatedUnix = %d, want between %d and %d", character.Player.DateCreatedUnix, before, after)
 	}
-	if character.Player.HasPlayerData {
-		t.Fatal("HasPlayerData = true, want false")
+	if !character.Player.HasPlayerData {
+		t.Fatal("HasPlayerData = false, want true")
+	}
+	if character.Player.PlayerVersion != supportedPlayerVersion {
+		t.Fatalf("PlayerVersion = %d, want %d", character.Player.PlayerVersion, supportedPlayerVersion)
+	}
+	if character.Player.InventoryVersion != supportedInventoryVersion {
+		t.Fatalf("InventoryVersion = %d, want %d", character.Player.InventoryVersion, supportedInventoryVersion)
+	}
+	if character.Player.SkillVersion != supportedSkillVersion {
+		t.Fatalf("SkillVersion = %d, want %d", character.Player.SkillVersion, supportedSkillVersion)
 	}
 }
 
@@ -255,7 +264,6 @@ func TestCharacterValidateRejectsUnexpectedShape(t *testing.T) {
 
 func validCharacter() *Character {
 	character := NewCharacter("Valid Test", 123456)
-	character.Player = NewPlayer(character.Player.Name, character.Player.PlayerID)
 	character.Trailer.HashValid = true
 	return character
 }

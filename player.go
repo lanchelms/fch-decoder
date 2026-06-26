@@ -58,3 +58,11 @@ func NewPlayer(name string, playerID uint64) PlayerData {
 		SkillVersion:     supportedSkillVersion,
 	}
 }
+
+func NewPlayerStats() []StatEntry {
+	stats := make([]StatEntry, len(playerStatNames))
+	for i, name := range playerStatNames {
+		stats[i].Name = name
+	}
+	return stats
+}

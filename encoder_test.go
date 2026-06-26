@@ -94,8 +94,8 @@ func TestEncodeSyntheticCharacterDecodes(t *testing.T) {
 	}
 }
 
-func TestEncodeMinimalCharacterWithoutPlayerData(t *testing.T) {
-	character := NewCharacter("Minimal Test", 987654321)
+func TestEncodeNewCharacterWithPlayerData(t *testing.T) {
+	character := NewCharacter("New Test", 987654321)
 	encoded, err := EncodeBytes(character)
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +104,36 @@ func TestEncodeMinimalCharacterWithoutPlayerData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertMinimalCharacter(t, decoded, "Minimal Test", 987654321, character.Player.DateCreatedUnix)
+	if decoded.Player.Name != "New Test" {
+		t.Fatalf("Player.Name = %q, want New Test", decoded.Player.Name)
+	}
+	if decoded.Player.PlayerID != 987654321 {
+		t.Fatalf("PlayerID = %d, want 987654321", decoded.Player.PlayerID)
+	}
+	if decoded.Player.DateCreatedUnix != character.Player.DateCreatedUnix {
+		t.Fatalf("DateCreatedUnix = %d, want %d", decoded.Player.DateCreatedUnix, character.Player.DateCreatedUnix)
+	}
+	if !decoded.Player.HasPlayerData {
+		t.Fatal("HasPlayerData = false, want true")
+	}
+	if decoded.Player.PlayerVersion != supportedPlayerVersion {
+		t.Fatalf("PlayerVersion = %d, want %d", decoded.Player.PlayerVersion, supportedPlayerVersion)
+	}
+	if decoded.Player.InventoryVersion != supportedInventoryVersion {
+		t.Fatalf("InventoryVersion = %d, want %d", decoded.Player.InventoryVersion, supportedInventoryVersion)
+	}
+	if decoded.Player.SkillVersion != supportedSkillVersion {
+		t.Fatalf("SkillVersion = %d, want %d", decoded.Player.SkillVersion, supportedSkillVersion)
+	}
+	if decoded.Player.PlayerDataLength == 0 {
+		t.Fatal("PlayerDataLength = 0, want encoded player data")
+	}
+	if !decoded.Trailer.HashValid {
+		t.Fatal("Trailer.HashValid = false, want true")
+	}
+	if decoded.RemainingBytes != 0 {
+		t.Fatalf("RemainingBytes = %d, want 0", decoded.RemainingBytes)
+	}
 }
 
 func TestEncodeWritesToWriter(t *testing.T) {
