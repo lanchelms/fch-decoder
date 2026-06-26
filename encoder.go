@@ -121,12 +121,12 @@ func (e *encoder) inventory(items []Item) {
 }
 
 func (e *encoder) playerTail(p Player) error {
-	writeList(e.w, p.KnownRecipes, e.str)
+	writeList(e.w, p.KnownRecipes, e.w.str)
 	writeList(e.w, p.KnownStations, e.station)
-	writeList(e.w, p.KnownMaterials, e.str)
-	writeList(e.w, p.ShownTutorials, e.str)
-	writeList(e.w, p.Uniques, e.str)
-	writeList(e.w, p.Trophies, e.str)
+	writeList(e.w, p.KnownMaterials, e.w.str)
+	writeList(e.w, p.ShownTutorials, e.w.str)
+	writeList(e.w, p.Uniques, e.w.str)
+	writeList(e.w, p.Trophies, e.w.str)
 	writeList(e.w, p.KnownBiomes, e.biome)
 	writeList(e.w, p.PlayerKnownTexts, e.textEntry)
 
@@ -158,10 +158,6 @@ func (e *encoder) playerTail(p Player) error {
 		return fmt.Errorf("fch: unsupported player tail float count %d", tailFloatCount)
 	}
 	return nil
-}
-
-func (e *encoder) str(v string) {
-	e.w.str(v)
 }
 
 func (e *encoder) statEntry(v StatEntry) {
