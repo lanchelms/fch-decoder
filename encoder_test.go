@@ -274,7 +274,7 @@ func syntheticCharacter() *Character {
 			{Name: "Deaths", Value: 1},
 			{Name: "CraftingStationUses", Value: 2.5},
 		},
-		Map:              MapSection{Raw: syntheticMapSection()},
+		Map:              Map{Raw: syntheticMapSection()},
 		HasPlayerData:    true,
 		PlayerDataLength: 999,
 		Player: Player{
@@ -283,7 +283,7 @@ func syntheticCharacter() *Character {
 			StartSeed:       "seed",
 			UsedCheats:      true,
 			DateCreatedUnix: 1780027200,
-			KnownWorlds: []TimedEntry{
+			KnownWorlds: []TimeEntry{
 				{Name: "world", Seconds: 12.5},
 			},
 			KnownWorldKeys: []WorldKey{

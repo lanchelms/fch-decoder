@@ -55,8 +55,8 @@ func TestListReaders(t *testing.T) {
 				w.str("World")
 				w.f32(42)
 			},
-			read: func(r *Reader) any { return readValue[TimedEntry, *TimedEntry](r) },
-			want: TimedEntry{Name: "World", Seconds: 42},
+			read: func(r *Reader) any { return readValue[TimeEntry, *TimeEntry](r) },
+			want: TimeEntry{Name: "World", Seconds: 42},
 		},
 		{
 			name: "textEntry",
@@ -148,7 +148,7 @@ func TestDecodeConvertedListsFromSample(t *testing.T) {
 	}
 	p := got.Player
 
-	if got := p.KnownWorlds[0]; got != (TimedEntry{Name: "LanChelmsDeepNorth2", Seconds: 284707}) {
+	if got := p.KnownWorlds[0]; got != (TimeEntry{Name: "LanChelmsDeepNorth2", Seconds: 284707}) {
 		t.Fatalf("KnownWorlds[0] = %+v", got)
 	}
 	if got := p.KnownWorldKeys[0]; got != (WorldKey{Raw: "nomap", Seconds: 7}) {

@@ -6,17 +6,17 @@ import (
 )
 
 type Player struct {
-	Name            string       `json:"name"`
-	PlayerID        uint64       `json:"playerId"`
-	StartSeed       string       `json:"startSeed"`
-	UsedCheats      bool         `json:"usedCheats"`
-	DateCreatedUnix int64        `json:"dateCreatedUnix"`
-	KnownWorlds     []TimedEntry `json:"knownWorlds,omitempty"`
-	KnownWorldKeys  []WorldKey   `json:"knownWorldKeys,omitempty"`
-	KnownCommands   []StatEntry  `json:"-"`
-	EnemyStats      []StatEntry  `json:"enemyStats,omitempty"`
-	MaterialStats   []StatEntry  `json:"materialStats,omitempty"`
-	RecipeStats     []StatEntry  `json:"recipeStats,omitempty"`
+	Name            string      `json:"name"`
+	PlayerID        uint64      `json:"playerId"`
+	StartSeed       string      `json:"startSeed"`
+	UsedCheats      bool        `json:"usedCheats"`
+	DateCreatedUnix int64       `json:"dateCreatedUnix"`
+	KnownWorlds     []TimeEntry `json:"knownWorlds,omitempty"`
+	KnownWorldKeys  []WorldKey  `json:"knownWorldKeys,omitempty"`
+	KnownCommands   []StatEntry `json:"-"`
+	EnemyStats      []StatEntry `json:"enemyStats,omitempty"`
+	MaterialStats   []StatEntry `json:"materialStats,omitempty"`
+	RecipeStats     []StatEntry `json:"recipeStats,omitempty"`
 	PlayerState
 	PlayerTail
 }
@@ -43,7 +43,7 @@ func (p *Player) Decode(r *Reader) {
 	p.UsedCheats = r.bool()
 	p.DateCreatedUnix = int64(r.u64())
 
-	p.KnownWorlds = readList[TimedEntry](r)
+	p.KnownWorlds = readList[TimeEntry](r)
 	p.KnownWorldKeys = readList[WorldKey](r)
 	p.KnownCommands = readList[StatEntry](r)
 	p.EnemyStats = readList[StatEntry](r)

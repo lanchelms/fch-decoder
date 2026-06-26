@@ -24,7 +24,7 @@ type Character struct {
 	Version          uint32      `json:"version"`
 	PlayerStatCount  uint32      `json:"playerStatCount"`
 	PlayerStats      []StatEntry `json:"playerStats,omitempty"`
-	Map              MapSection  `json:"map"`
+	Map              Map         `json:"map"`
 	HasPlayerData    bool        `json:"hasPlayerData"`
 	PlayerDataLength uint32      `json:"playerDataLength"`
 	Player           Player      `json:"player"`
@@ -38,7 +38,7 @@ func NewCharacter(name string, playerID uint64) *Character {
 		Version:         supportedCharacterVersion,
 		PlayerStatCount: uint32(len(playerStats)),
 		PlayerStats:     playerStats,
-		Map:             MapSection{Raw: []byte{1, 0, 0, 0, 0}},
+		Map:             Map{Raw: []byte{1, 0, 0, 0, 0}},
 		HasPlayerData:   true,
 		Player:          NewPlayer(name, playerID),
 	}
@@ -235,11 +235,10 @@ func (c *Character) RemoveInventoryItem(name string) error {
 
 // SetSkill updates an existing skill or appends a new skill record.
 func (c *Character) SetSkill(skillType int32, level float32) {
-	displayLevel := int32(math.Floor(float64(level)))
 	for i := range c.Player.Skills {
 		if c.Player.Skills[i].Type == skillType {
 			c.Player.Skills[i].Level = level
-			c.Player.Skills[i].DisplayLevel = displayLevel
+			c.Player.Skills[i].DisplayLevel = c.Player.Skills[i].displayLevel()
 			return
 		}
 	}
@@ -247,7 +246,7 @@ func (c *Character) SetSkill(skillType int32, level float32) {
 		Type:         skillType,
 		Name:         skillName(skillType),
 		Level:        level,
-		DisplayLevel: displayLevel,
+		DisplayLevel: int32(math.Floor(float64(level))),
 	})
 }
 
