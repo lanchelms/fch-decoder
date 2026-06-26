@@ -235,7 +235,7 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 			expected := before
 			tt.expect(expected)
 			expected.FileLength = after.FileLength
-			expected.Player.PlayerDataLength = after.Player.PlayerDataLength
+			expected.PlayerDataLength = after.PlayerDataLength
 			expected.Trailer = after.Trailer
 			expected.UpsertCustomData(fcheditLastModifiedKey, requireFcheditLastModified(t, after))
 

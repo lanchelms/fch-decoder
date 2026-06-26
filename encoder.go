@@ -65,10 +65,10 @@ func (e *encoder) payload(c *Character) error {
 		e.w.f32(stat.Value)
 	}
 	e.w.bytes(c.Map.Raw)
-	return e.player(c.Player)
+	return e.player(c.Player, c.HasPlayerData)
 }
 
-func (e *encoder) player(p Player) error {
+func (e *encoder) player(p Player, hasPlayerData bool) error {
 	e.w.str(p.Name)
 	e.w.u64(p.PlayerID)
 	e.w.str(p.StartSeed)
@@ -81,12 +81,12 @@ func (e *encoder) player(p Player) error {
 	writeList(e.w, p.EnemyStats, e.statEntry)
 	writeList(e.w, p.MaterialStats, e.statEntry)
 	writeList(e.w, p.RecipeStats, e.statEntry)
-	return e.playerData(p)
+	return e.playerData(p, hasPlayerData)
 }
 
-func (e *encoder) playerData(p Player) error {
-	e.w.bool(p.HasPlayerData)
-	if !p.HasPlayerData {
+func (e *encoder) playerData(p Player, hasPlayerData bool) error {
+	e.w.bool(hasPlayerData)
+	if !hasPlayerData {
 		return nil
 	}
 

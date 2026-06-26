@@ -30,7 +30,7 @@ func TestNewCharacter(t *testing.T) {
 	if character.Player.DateCreatedUnix < before || character.Player.DateCreatedUnix > after {
 		t.Fatalf("DateCreatedUnix = %d, want between %d and %d", character.Player.DateCreatedUnix, before, after)
 	}
-	if !character.Player.HasPlayerData {
+	if !character.HasPlayerData {
 		t.Fatal("HasPlayerData = false, want true")
 	}
 	if character.Player.PlayerVersion != supportedPlayerVersion {
@@ -215,7 +215,7 @@ func TestCharacterValidateRejectsUnexpectedShape(t *testing.T) {
 		{
 			name: "player data",
 			edit: func(character *Character) {
-				character.Player.HasPlayerData = false
+				character.HasPlayerData = false
 			},
 			want: "missing player data",
 		},

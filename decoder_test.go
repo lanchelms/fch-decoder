@@ -138,11 +138,11 @@ func TestDecodeSamples(t *testing.T) {
 			if got.Player.GuardianPower.Name != "GP_Eikthyr" {
 				t.Fatalf("GuardianPower = %q", got.Player.GuardianPower.Name)
 			}
-			if !got.Player.HasPlayerData {
+			if !got.HasPlayerData {
 				t.Fatal("HasPlayerData = false, want true")
 			}
-			if got.Player.PlayerDataLength != tt.playerLength {
-				t.Fatalf("PlayerDataLength = %d, want %d", got.Player.PlayerDataLength, tt.playerLength)
+			if got.PlayerDataLength != tt.playerLength {
+				t.Fatalf("PlayerDataLength = %d, want %d", got.PlayerDataLength, tt.playerLength)
 			}
 			if got.Player.PlayerVersion != 29 {
 				t.Fatalf("PlayerVersion = %d, want 29", got.Player.PlayerVersion)
@@ -398,11 +398,11 @@ func assertMinimalCharacter(t *testing.T, got *Character, name string, playerID 
 	if !emptyMinimalLists(got.Player) {
 		t.Fatalf("minimal player lists are not empty: %+v", got.Player)
 	}
-	if got.Player.HasPlayerData {
+	if got.HasPlayerData {
 		t.Fatal("HasPlayerData = true, want false")
 	}
-	if got.Player.PlayerDataLength != 0 {
-		t.Fatalf("PlayerDataLength = %d, want 0", got.Player.PlayerDataLength)
+	if got.PlayerDataLength != 0 {
+		t.Fatalf("PlayerDataLength = %d, want 0", got.PlayerDataLength)
 	}
 	if got.Player.PlayerVersion != 0 || got.Player.InventoryVersion != 0 || got.Player.SkillVersion != 0 {
 		t.Fatalf("player versions = %d/%d/%d, want zero", got.Player.PlayerVersion, got.Player.InventoryVersion, got.Player.SkillVersion)

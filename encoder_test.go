@@ -113,7 +113,7 @@ func TestEncodeNewCharacterWithPlayerData(t *testing.T) {
 	if decoded.Player.DateCreatedUnix != character.Player.DateCreatedUnix {
 		t.Fatalf("DateCreatedUnix = %d, want %d", decoded.Player.DateCreatedUnix, character.Player.DateCreatedUnix)
 	}
-	if !decoded.Player.HasPlayerData {
+	if !decoded.HasPlayerData {
 		t.Fatal("HasPlayerData = false, want true")
 	}
 	if decoded.Player.PlayerVersion != supportedPlayerVersion {
@@ -125,7 +125,7 @@ func TestEncodeNewCharacterWithPlayerData(t *testing.T) {
 	if decoded.Player.SkillVersion != supportedSkillVersion {
 		t.Fatalf("SkillVersion = %d, want %d", decoded.Player.SkillVersion, supportedSkillVersion)
 	}
-	if decoded.Player.PlayerDataLength == 0 {
+	if decoded.PlayerDataLength == 0 {
 		t.Fatal("PlayerDataLength = 0, want encoded player data")
 	}
 	if !decoded.Trailer.HashValid {
@@ -218,8 +218,8 @@ func TestEncodeRecalculatesPlayerDataLength(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if decoded.Player.PlayerDataLength <= character.Player.PlayerDataLength {
-		t.Fatalf("PlayerDataLength = %d, want greater than original %d", decoded.Player.PlayerDataLength, character.Player.PlayerDataLength)
+	if decoded.PlayerDataLength <= character.PlayerDataLength {
+		t.Fatalf("PlayerDataLength = %d, want greater than original %d", decoded.PlayerDataLength, character.PlayerDataLength)
 	}
 	if len(decoded.Player.Inventory) != len(character.Player.Inventory) {
 		t.Fatalf("Inventory = %d, want %d", len(decoded.Player.Inventory), len(character.Player.Inventory))
@@ -274,7 +274,9 @@ func syntheticCharacter() *Character {
 			{Name: "Deaths", Value: 1},
 			{Name: "CraftingStationUses", Value: 2.5},
 		},
-		Map: MapSection{Raw: syntheticMapSection()},
+		Map:              MapSection{Raw: syntheticMapSection()},
+		HasPlayerData:    true,
+		PlayerDataLength: 999,
 		Player: Player{
 			Name:            "Encoder Test",
 			PlayerID:        123456,
@@ -299,16 +301,14 @@ func syntheticCharacter() *Character {
 			RecipeStats: []StatEntry{
 				{Name: "Hammer", Value: 5},
 			},
-			HasPlayerData:    true,
-			PlayerDataLength: 999,
-			PlayerVersion:    29,
-			MaxHealth:        100,
-			Health:           75,
-			MaxStamina:       120,
-			Stamina:          84,
-			MaxEitr:          50,
-			Eitr:             25,
-			TimeSinceDeath:   6,
+			PlayerVersion:  29,
+			MaxHealth:      100,
+			Health:         75,
+			MaxStamina:     120,
+			Stamina:        84,
+			MaxEitr:        50,
+			Eitr:           25,
+			TimeSinceDeath: 6,
 			GuardianPower: GuardianPower{
 				Name:     "GP_Eikthyr",
 				Cooldown: 7,

@@ -16,9 +16,6 @@ func TestNewPlayer(t *testing.T) {
 	if player.DateCreatedUnix < before || player.DateCreatedUnix > after {
 		t.Fatalf("DateCreatedUnix = %d, want between %d and %d", player.DateCreatedUnix, before, after)
 	}
-	if !player.HasPlayerData {
-		t.Fatal("HasPlayerData = false, want true")
-	}
 	if player.PlayerVersion != supportedPlayerVersion {
 		t.Fatalf("PlayerVersion = %d, want %d", player.PlayerVersion, supportedPlayerVersion)
 	}

@@ -15,8 +15,6 @@ type Player struct {
 	MaterialStats    []StatEntry   `json:"materialStats,omitempty"`
 	RecipeStats      []StatEntry   `json:"recipeStats,omitempty"`
 	GuardianPower    GuardianPower `json:"guardianPower"`
-	HasPlayerData    bool          `json:"hasPlayerData"`
-	PlayerDataLength uint32        `json:"playerDataLength"`
 	PlayerVersion    uint32        `json:"playerVersion"`
 	MaxHealth        float32       `json:"maxHealth"`
 	Health           float32       `json:"health"`
@@ -52,7 +50,6 @@ func NewPlayer(name string, playerID uint64) Player {
 		Name:             name,
 		PlayerID:         playerID,
 		DateCreatedUnix:  time.Now().Unix(),
-		HasPlayerData:    true,
 		PlayerVersion:    supportedPlayerVersion,
 		InventoryVersion: supportedInventoryVersion,
 		SkillVersion:     supportedSkillVersion,

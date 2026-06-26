@@ -19,14 +19,16 @@ const (
 )
 
 type Character struct {
-	FileLength      uint32      `json:"fileLength"`
-	Version         uint32      `json:"version"`
-	PlayerStatCount uint32      `json:"playerStatCount"`
-	PlayerStats     []StatEntry `json:"playerStats,omitempty"`
-	Map             MapSection  `json:"map"`
-	Player          Player      `json:"player"`
-	Trailer         Trailer     `json:"trailer"`
-	RemainingBytes  int         `json:"remainingBytes"`
+	FileLength       uint32      `json:"fileLength"`
+	Version          uint32      `json:"version"`
+	PlayerStatCount  uint32      `json:"playerStatCount"`
+	PlayerStats      []StatEntry `json:"playerStats,omitempty"`
+	Map              MapSection  `json:"map"`
+	HasPlayerData    bool        `json:"hasPlayerData"`
+	PlayerDataLength uint32      `json:"playerDataLength"`
+	Player           Player      `json:"player"`
+	Trailer          Trailer     `json:"trailer"`
+	RemainingBytes   int         `json:"remainingBytes"`
 }
 
 func NewCharacter(name string, playerID uint64) *Character {
@@ -36,6 +38,7 @@ func NewCharacter(name string, playerID uint64) *Character {
 		PlayerStatCount: uint32(len(playerStats)),
 		PlayerStats:     playerStats,
 		Map:             MapSection{Raw: []byte{1, 0, 0, 0, 0}},
+		HasPlayerData:   true,
 		Player:          NewPlayer(name, playerID),
 	}
 }
@@ -48,7 +51,7 @@ func (c *Character) Validate() error {
 	if !c.Trailer.HashValid {
 		return fmt.Errorf("invalid trailer hash")
 	}
-	if !c.Player.HasPlayerData {
+	if !c.HasPlayerData {
 		return fmt.Errorf("missing player data")
 	}
 	if c.Player.PlayerVersion != supportedPlayerVersion {

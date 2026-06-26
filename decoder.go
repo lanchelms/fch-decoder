@@ -140,11 +140,13 @@ func DecodeBytes(data []byte) (character *Character, err error) {
 	c.Map = mapSection
 
 	pr := newReader(data[playerOffset:payloadEnd])
-	player, err := decodePlayer(pr)
+	player, hasPlayerData, playerDataLength, err := decodePlayer(pr)
 	if err != nil {
 		return nil, fmt.Errorf("fch: player section at offset %d: %w", playerOffset+pr.pos, err)
 	}
 	c.Player = player
+	c.HasPlayerData = hasPlayerData
+	c.PlayerDataLength = playerDataLength
 	c.RemainingBytes = pr.remaining()
 
 	trailerOffset := payloadEnd
@@ -204,7 +206,7 @@ func readMapPrefix(data []byte, startOffset int, payloadEnd int) (byte, uint32, 
 	return firstSpawn, worldCount, true
 }
 
-func decodePlayer(r *reader) (Player, error) {
+func decodePlayer(r *reader) (Player, bool, uint32, error) {
 	var p Player
 	p.Name = r.str()
 	p.PlayerID = r.u64()
@@ -218,13 +220,13 @@ func decodePlayer(r *reader) (Player, error) {
 	p.EnemyStats = readList(r, statEntry)
 	p.MaterialStats = readList(r, statEntry)
 	p.RecipeStats = readList(r, statEntry)
-	readPlayerState(r, &p)
-	if !p.HasPlayerData {
-		return p, nil
+	hasPlayerData, playerDataLength := readPlayerState(r, &p)
+	if !hasPlayerData {
+		return p, hasPlayerData, playerDataLength, nil
 	}
 	p.Inventory = readInventory(r)
 	readPlayerTail(r, &p)
-	return p, nil
+	return p, hasPlayerData, playerDataLength, nil
 }
 
 func readPlayerTail(r *reader, p *Player) {
@@ -262,12 +264,12 @@ func readPlayerTail(r *reader, p *Player) {
 	}
 }
 
-func readPlayerState(r *reader, p *Player) {
-	p.HasPlayerData = r.bool()
-	if !p.HasPlayerData {
-		return
+func readPlayerState(r *reader, p *Player) (bool, uint32) {
+	hasPlayerData := r.bool()
+	if !hasPlayerData {
+		return false, 0
 	}
-	p.PlayerDataLength = r.u32()
+	playerDataLength := r.u32()
 	p.PlayerVersion = r.u32()
 	p.MaxHealth = r.f32()
 	p.Health = r.f32()
@@ -278,6 +280,7 @@ func readPlayerState(r *reader, p *Player) {
 		Cooldown: r.f32(),
 	}
 	p.InventoryVersion = r.u32()
+	return true, playerDataLength
 }
 
 func readInventory(r *reader) []Item {
