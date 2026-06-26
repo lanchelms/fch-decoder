@@ -267,8 +267,12 @@ func TestDecodeDetectsInvalidTrailerHash(t *testing.T) {
 	}
 }
 
-func TestDecodeMinimalCharacterWithoutPlayerData(t *testing.T) {
-	got, err := DecodeBytes(minimalCharacterBytes())
+func TestDecodeMinimalCharacterFixtureWithoutPlayerData(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("testdata", "decoder", "minimal_no_player_data.fch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := DecodeBytes(fixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,33 +372,6 @@ func appendF32(data []byte, value float32) []byte {
 func appendString(data []byte, value string) []byte {
 	data = append(data, byte(len(value)))
 	return append(data, value...)
-}
-
-func minimalCharacterBytes() []byte {
-	payload := newWriter()
-	payload.u32(43)
-	payload.u32(105)
-	for range 105 {
-		payload.f32(0)
-	}
-	payload.bytes(minimalMapSection())
-	payload.str("Minimal Test")
-	payload.u64(987654321)
-	payload.str("")
-	payload.bool(false)
-	payload.u64(1780027200)
-	for range 6 {
-		payload.u32(0)
-	}
-	payload.bool(false)
-
-	payloadBytes := payload.data()
-	file := newWriter()
-	file.u32(uint32(len(payloadBytes)))
-	file.bytes(payloadBytes)
-	file.u32(payloadHashSize)
-	file.bytes(payloadHash(payloadBytes))
-	return file.data()
 }
 
 func minimalMapSection() []byte {

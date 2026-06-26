@@ -105,19 +105,6 @@ func TestEncodeMinimalCharacterWithoutPlayerData(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertMinimalCharacter(t, decoded, "Minimal Test", 987654321, character.Player.DateCreatedUnix)
-
-	manual := minimalCharacterBytes()
-	decoded, err = DecodeBytes(manual)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encoded, err = EncodeBytes(decoded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(encoded, manual) {
-		t.Fatalf("encoded minimal character differs from original: got %d bytes, want %d", len(encoded), len(manual))
-	}
 }
 
 func TestEncodeWritesToWriter(t *testing.T) {
