@@ -11,6 +11,13 @@ const (
 	inventoryHeight = 4
 )
 
+const (
+	supportedCharacterVersion = 43
+	supportedPlayerVersion    = 29
+	supportedInventoryVersion = 106
+	supportedSkillVersion     = 2
+)
+
 type Character struct {
 	FileLength      uint32      `json:"fileLength"`
 	Version         uint32      `json:"version"`
@@ -20,6 +27,32 @@ type Character struct {
 	Player          PlayerData  `json:"player"`
 	Trailer         Trailer     `json:"trailer"`
 	RemainingBytes  int         `json:"remainingBytes"`
+}
+
+// Validate verifies that the character matches the file shape this package can safely edit.
+func (c *Character) Validate() error {
+	if c.Version != supportedCharacterVersion {
+		return fmt.Errorf("unsupported character version %d", c.Version)
+	}
+	if !c.Trailer.HashValid {
+		return fmt.Errorf("invalid trailer hash")
+	}
+	if !c.Player.HasPlayerData {
+		return fmt.Errorf("missing player data")
+	}
+	if c.Player.PlayerVersion != supportedPlayerVersion {
+		return fmt.Errorf("unsupported player version %d", c.Player.PlayerVersion)
+	}
+	if c.Player.InventoryVersion != supportedInventoryVersion {
+		return fmt.Errorf("unsupported inventory version %d", c.Player.InventoryVersion)
+	}
+	if c.Player.SkillVersion != supportedSkillVersion {
+		return fmt.Errorf("unsupported skill version %d", c.Player.SkillVersion)
+	}
+	if c.RemainingBytes != 0 {
+		return fmt.Errorf("decoded character has %d unread player bytes", c.RemainingBytes)
+	}
+	return nil
 }
 
 // AddInventoryItem appends item to the character inventory.

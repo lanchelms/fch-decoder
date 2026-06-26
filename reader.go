@@ -23,6 +23,14 @@ func (r *reader) remaining() int {
 	return len(r.data) - r.pos
 }
 
+func (r *reader) capacity(count uint32) int {
+	capacity := int(count)
+	if capacity > r.remaining() {
+		return r.remaining()
+	}
+	return capacity
+}
+
 func (r *reader) need(n int) bool {
 	return n >= 0 && r.pos+n <= len(r.data)
 }

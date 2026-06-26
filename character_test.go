@@ -1,6 +1,9 @@
 package fch
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCharacterEditMethods(t *testing.T) {
 	character := &Character{}
@@ -67,5 +70,96 @@ func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {
 
 	if err := character.PlaceInventoryItem(Item{Name: "Stone"}); err == nil {
 		t.Fatal("PlaceInventoryItem error = nil, want full inventory error")
+	}
+}
+
+func TestCharacterValidate(t *testing.T) {
+	character := validCharacter()
+
+	if err := character.Validate(); err != nil {
+		t.Fatalf("Validate error = %v", err)
+	}
+}
+
+func TestCharacterValidateRejectsUnexpectedShape(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*Character)
+		want string
+	}{
+		{
+			name: "character version",
+			edit: func(character *Character) {
+				character.Version++
+			},
+			want: "unsupported character version 44",
+		},
+		{
+			name: "trailer hash",
+			edit: func(character *Character) {
+				character.Trailer.HashValid = false
+			},
+			want: "invalid trailer hash",
+		},
+		{
+			name: "player data",
+			edit: func(character *Character) {
+				character.Player.HasPlayerData = false
+			},
+			want: "missing player data",
+		},
+		{
+			name: "player version",
+			edit: func(character *Character) {
+				character.Player.PlayerVersion++
+			},
+			want: "unsupported player version 30",
+		},
+		{
+			name: "inventory version",
+			edit: func(character *Character) {
+				character.Player.InventoryVersion++
+			},
+			want: "unsupported inventory version 107",
+		},
+		{
+			name: "skill version",
+			edit: func(character *Character) {
+				character.Player.SkillVersion++
+			},
+			want: "unsupported skill version 3",
+		},
+		{
+			name: "remaining bytes",
+			edit: func(character *Character) {
+				character.RemainingBytes = 4
+			},
+			want: "decoded character has 4 unread player bytes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			character := validCharacter()
+			tt.edit(character)
+
+			err := character.Validate()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Validate error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func validCharacter() *Character {
+	return &Character{
+		Version: supportedCharacterVersion,
+		Player: PlayerData{
+			HasPlayerData:    true,
+			PlayerVersion:    supportedPlayerVersion,
+			InventoryVersion: supportedInventoryVersion,
+			SkillVersion:     supportedSkillVersion,
+		},
+		Trailer: Trailer{HashValid: true},
 	}
 }

@@ -267,6 +267,51 @@ func TestDecodeDetectsInvalidTrailerHash(t *testing.T) {
 	}
 }
 
+func TestDecodeMalformedInputReturnsError(t *testing.T) {
+	data := make([]byte, fileOverhead+16)
+	binary.LittleEndian.PutUint32(data[:4], uint32(len(data)-fileOverhead))
+	binary.LittleEndian.PutUint32(data[8:12], math.MaxUint32)
+
+	if _, err := DecodeBytes(data); err == nil {
+		t.Fatal("DecodeBytes error = nil, want malformed input error")
+	}
+}
+
+func FuzzDecodeEncode(f *testing.F) {
+	files := []string{
+		"Steam_111111_fenris bueller.fch",
+		"Steam_222222_bortson.fch",
+		"Steam_333333_tugen.fch",
+	}
+	for _, file := range files {
+		data, err := os.ReadFile(filepath.Join("testdata", file))
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(data)
+	}
+	f.Add([]byte{})
+	f.Add([]byte{0, 1, 2, 3, 4})
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		character, err := DecodeBytes(data)
+		if err != nil {
+			return
+		}
+		encoded, err := EncodeBytes(character)
+		if err != nil {
+			t.Fatalf("EncodeBytes after successful decode error = %v", err)
+		}
+		decoded, err := DecodeBytes(encoded)
+		if err != nil {
+			t.Fatalf("DecodeBytes after encode error = %v", err)
+		}
+		if !decoded.Trailer.HashValid {
+			t.Fatal("encoded trailer hash is invalid")
+		}
+	})
+}
+
 func TestReadInventoryCustomData(t *testing.T) {
 	var data []byte
 	data = appendU32(data, 1)

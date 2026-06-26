@@ -7,7 +7,7 @@ import (
 
 func readList[T any](r *reader, read func(*reader) T) []T {
 	count := r.u32()
-	out := make([]T, 0, count)
+	out := make([]T, 0, r.capacity(count))
 	for range count {
 		out = append(out, read(r))
 	}

@@ -147,7 +147,14 @@ func Decode(r io.Reader) (*Character, error) {
 	return DecodeBytes(data)
 }
 
-func DecodeBytes(data []byte) (*Character, error) {
+func DecodeBytes(data []byte) (character *Character, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			character = nil
+			err = fmt.Errorf("fch: decode failed: %v", recovered)
+		}
+	}()
+
 	if len(data) < fileOverhead+16 {
 		return nil, fmt.Errorf("fch: file too short: %d bytes", len(data))
 	}
@@ -160,6 +167,9 @@ func DecodeBytes(data []byte) (*Character, error) {
 	payloadEnd := fileLengthSize + int(c.FileLength)
 	if int(c.FileLength)+fileOverhead != len(data) {
 		return nil, fmt.Errorf("fch: length header %d does not match file size %d", c.FileLength, len(data))
+	}
+	if int(c.PlayerStatCount) > (payloadEnd-rd.pos)/4 {
+		return nil, fmt.Errorf("fch: player stat count %d exceeds payload size", c.PlayerStatCount)
 	}
 
 	c.PlayerStats = make([]StatEntry, 0, c.PlayerStatCount)
@@ -294,7 +304,7 @@ func readPlayerState(r *reader, p *PlayerData) {
 
 func readInventory(r *reader) []Item {
 	count := r.u32()
-	out := make([]Item, 0, count)
+	out := make([]Item, 0, r.capacity(count))
 	for range count {
 		item := Item{
 			Name:        r.str(),

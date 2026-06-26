@@ -228,6 +228,9 @@ func (r *editRunner) apply(edit func(*fch.Character) error, summary string) erro
 	if err != nil {
 		return err
 	}
+	if err := character.Validate(); err != nil {
+		return fmt.Errorf("validate character %s: %w", r.path, err)
+	}
 	if err := edit(character); err != nil {
 		return err
 	}

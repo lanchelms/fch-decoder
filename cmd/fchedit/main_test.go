@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha512"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -441,30 +443,148 @@ func TestRunRejectsUnsafeValues(t *testing.T) {
 	}
 }
 
+func TestRunRejectsInvalidTrailerHash(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	before := readFile(t, in)
+	data := append([]byte(nil), before...)
+	data[12] ^= 1
+	writeTestFile(t, in, data)
+
+	err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+	if err == nil || !strings.Contains(err.Error(), "invalid trailer hash") {
+		t.Fatalf("run error = %v, want invalid trailer hash", err)
+	}
+	if got := readFile(t, in); !bytes.Equal(got, data) {
+		t.Fatal("fchedit modified a file with an invalid trailer hash")
+	}
+	if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
+		t.Fatalf("backup stat error = %v, want not exist", err)
+	}
+}
+
+func TestRunRejectsUnsupportedVersions(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*fch.Character)
+		want string
+	}{
+		{
+			name: "character version",
+			edit: func(character *fch.Character) {
+				character.Version++
+			},
+			want: "unsupported character version 44",
+		},
+		{
+			name: "player version",
+			edit: func(character *fch.Character) {
+				character.Player.PlayerVersion++
+			},
+			want: "unsupported player version 30",
+		},
+		{
+			name: "inventory version",
+			edit: func(character *fch.Character) {
+				character.Player.InventoryVersion++
+			},
+			want: "unsupported inventory version 107",
+		},
+		{
+			name: "skill version",
+			edit: func(character *fch.Character) {
+				character.Player.SkillVersion++
+			},
+			want: "unsupported skill version 3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := copyFixture(t, "Steam_333333_tugen.fch")
+			character := decodeFile(t, in)
+			tt.edit(character)
+			data, err := fch.EncodeBytes(character)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeTestFile(t, in, data)
+
+			err = run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("run error = %v, want %q", err, tt.want)
+			}
+			if got := readFile(t, in); !bytes.Equal(got, data) {
+				t.Fatal("fchedit modified a file with an unsupported version")
+			}
+		})
+	}
+}
+
+func TestRunRejectsUnreadPlayerBytes(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	data := readFile(t, in)
+	data = insertPayloadBytes(data, len(data)-68, []byte{0xde, 0xad, 0xbe, 0xef})
+	writeTestFile(t, in, data)
+
+	err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+	if err == nil || !strings.Contains(err.Error(), "unread player bytes") {
+		t.Fatalf("run error = %v, want unread player bytes", err)
+	}
+	if got := readFile(t, in); !bytes.Equal(got, data) {
+		t.Fatal("fchedit modified a file with unread player bytes")
+	}
+}
+
 func copyFixture(t *testing.T, name string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := readFile(t, filepath.Join("..", "..", "testdata", name))
 	path := filepath.Join(t.TempDir(), name)
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(t, path, data)
 	return path
 }
 
 func decodeFile(t *testing.T, path string) *fch.Character {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := fch.DecodeBytes(data)
+	defer file.Close()
+
+	got, err := fch.Decode(file)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return got
+}
+
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func writeTestFile(t *testing.T, path string, data []byte) {
+	t.Helper()
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertPayloadBytes(data []byte, offset int, inserted []byte) []byte {
+	out := make([]byte, 0, len(data)+len(inserted))
+	out = append(out, data[:offset]...)
+	out = append(out, inserted...)
+	out = append(out, data[offset:]...)
+
+	payloadLen := binary.LittleEndian.Uint32(out[:4]) + uint32(len(inserted))
+	binary.LittleEndian.PutUint32(out[:4], payloadLen)
+	hash := sha512.Sum512(out[4 : 4+payloadLen])
+	copy(out[8+payloadLen:], hash[:])
+	return out
 }
 
 func findItem(items []fch.Item, name string) *fch.Item {
