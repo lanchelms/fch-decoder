@@ -1,6 +1,7 @@
 package fch
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +30,53 @@ func TestNewCharacter(t *testing.T) {
 	if character.Player.HasPlayerData {
 		t.Fatal("HasPlayerData = true, want false")
 	}
+}
+
+func FuzzNewCharacterEncode(f *testing.F) {
+	f.Add("New Test", uint64(123456))
+	f.Add("", uint64(0))
+	f.Add("Fenris Bueller", uint64(111111))
+	f.Add("null\x00byte", uint64(1<<63))
+
+	f.Fuzz(func(t *testing.T, name string, playerID uint64) {
+		if len(name) > 4096 {
+			return
+		}
+
+		character := NewCharacter(name, playerID)
+		encoded, err := EncodeBytes(character)
+		if err != nil {
+			t.Fatalf("EncodeBytes(NewCharacter(%q, %d)) error = %v", name, playerID, err)
+		}
+
+		decoded, err := DecodeBytes(encoded)
+		if err != nil {
+			t.Fatalf("DecodeBytes after NewCharacter encode error = %v", err)
+		}
+		if decoded.Player.Name != name {
+			t.Fatalf("Player.Name = %q, want %q", decoded.Player.Name, name)
+		}
+		if decoded.Player.PlayerID != playerID {
+			t.Fatalf("PlayerID = %d, want %d", decoded.Player.PlayerID, playerID)
+		}
+		if decoded.Player.DateCreatedUnix != character.Player.DateCreatedUnix {
+			t.Fatalf("DateCreatedUnix = %d, want %d", decoded.Player.DateCreatedUnix, character.Player.DateCreatedUnix)
+		}
+		if decoded.FileLength != uint32(len(encoded)-fileOverhead) {
+			t.Fatalf("FileLength = %d, want %d", decoded.FileLength, len(encoded)-fileOverhead)
+		}
+		if !decoded.Trailer.HashValid {
+			t.Fatal("Trailer.HashValid = false, want true")
+		}
+
+		reencoded, err := EncodeBytes(decoded)
+		if err != nil {
+			t.Fatalf("EncodeBytes after NewCharacter decode error = %v", err)
+		}
+		if !bytes.Equal(reencoded, encoded) {
+			t.Fatalf("NewCharacter encoded data is not stable: reencoded %d bytes, want %d", len(reencoded), len(encoded))
+		}
+	})
 }
 
 func TestCharacterEditMethods(t *testing.T) {
