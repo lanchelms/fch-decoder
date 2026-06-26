@@ -15,8 +15,11 @@ func TestNewCharacter(t *testing.T) {
 	if character.Version != supportedCharacterVersion {
 		t.Fatalf("Version = %d, want %d", character.Version, supportedCharacterVersion)
 	}
-	if character.PlayerStatCount != 105 || len(character.PlayerStats) != 105 {
-		t.Fatalf("PlayerStats = count %d entries %d, want 105", character.PlayerStatCount, len(character.PlayerStats))
+	if character.PlayerStatCount != uint32(len(playerStatNames)) || len(character.PlayerStats) != len(playerStatNames) {
+		t.Fatalf("PlayerStats = count %d entries %d, want %d", character.PlayerStatCount, len(character.PlayerStats), len(playerStatNames))
+	}
+	if character.PlayerStats[0].Name != "Deaths" || character.PlayerStats[len(character.PlayerStats)-1].Name != "UsePowerDeepNorth" {
+		t.Fatalf("bad player stat names: first=%q last=%q", character.PlayerStats[0].Name, character.PlayerStats[len(character.PlayerStats)-1].Name)
 	}
 	if string(character.Map.Raw) != string(minimalMapSection()) {
 		t.Fatalf("Map.Raw = %v, want %v", character.Map.Raw, minimalMapSection())

@@ -31,7 +31,7 @@ type Character struct {
 }
 
 func NewCharacter(name string, playerID uint64) *Character {
-	playerStats := make([]StatEntry, 105)
+	playerStats := newPlayerStats()
 	return &Character{
 		Version:         supportedCharacterVersion,
 		PlayerStatCount: uint32(len(playerStats)),
@@ -44,6 +44,14 @@ func NewCharacter(name string, playerID uint64) *Character {
 			HasPlayerData:   false,
 		},
 	}
+}
+
+func newPlayerStats() []StatEntry {
+	stats := make([]StatEntry, len(playerStatNames))
+	for i, name := range playerStatNames {
+		stats[i].Name = name
+	}
+	return stats
 }
 
 // Validate verifies that the character matches the file shape this package can safely edit.
