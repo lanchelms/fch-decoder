@@ -8,6 +8,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY *.go ./
+COPY data ./data
 COPY cmd/fchdump/main.go ./cmd/fchdump/main.go
 
 ARG TARGETOS
