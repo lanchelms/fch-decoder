@@ -418,12 +418,77 @@ func TestRunRejectsUnknownSkill(t *testing.T) {
 
 func TestRunCreatesInPlaceBackup(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
+	before := readFile(t, in)
 
-	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, ioDiscard{}, ioDiscard{}); err != nil {
+	var stdout bytes.Buffer
+	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(in + ".bak"); err != nil {
+	backup := in + ".bak"
+	if _, err := os.Stat(backup); err != nil {
 		t.Fatalf("backup stat error = %v", err)
+	}
+	if got := readFile(t, backup); !bytes.Equal(got, before) {
+		t.Fatal("backup did not preserve the pre-edit character file")
+	}
+	if !strings.Contains(stdout.String(), "backup "+backup) {
+		t.Fatalf("stdout = %q, want backup line", stdout.String())
+	}
+}
+
+func TestRunReusesRecentInPlaceBackup(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	now := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	backup := in + ".bak"
+	numberedBackup := in + ".bak.1"
+	backupData := []byte("first rollback point")
+	writeTestFile(t, backup, backupData)
+	if err := os.Chtimes(backup, now.Add(-30*time.Minute), now.Add(-30*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	err := runTimed([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}, func() time.Time {
+		return now
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readFile(t, backup); !bytes.Equal(got, backupData) {
+		t.Fatal("recent backup was overwritten")
+	}
+	if _, err := os.Stat(numberedBackup); !os.IsNotExist(err) {
+		t.Fatalf("numbered backup stat error = %v, want not exist", err)
+	}
+	if strings.Contains(stdout.String(), "backup ") {
+		t.Fatalf("stdout = %q, want no backup line", stdout.String())
+	}
+}
+
+func TestRunOverwritesStaleInPlaceBackup(t *testing.T) {
+	in := copyFixture(t, "Steam_333333_tugen.fch")
+	before := readFile(t, in)
+	now := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	backup := in + ".bak"
+	writeTestFile(t, backup, []byte("old rollback point"))
+	if err := os.Chtimes(backup, now.Add(-time.Hour-time.Second), now.Add(-time.Hour-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	err := runTimed([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}, func() time.Time {
+		return now
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readFile(t, backup); !bytes.Equal(got, before) {
+		t.Fatal("stale backup was not overwritten with the pre-edit character file")
+	}
+	if !strings.Contains(stdout.String(), "backup "+backup) {
+		t.Fatalf("stdout = %q, want backup line", stdout.String())
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 
 const (
 	characterEnv             = "CHARACTER"
+	backupReuseWindow        = time.Hour
 	fcheditLastModifiedKey   = "fchedit.lastModified"
 	fcheditLastModifiedValue = time.RFC3339
 )
@@ -262,7 +263,8 @@ func (r *editRunner) apply(edit func(*fch.Character) error, summary string) erro
 	if err := edit(character); err != nil {
 		return err
 	}
-	lastModified := r.editTime().UTC().Format(fcheditLastModifiedValue)
+	editTime := r.editTime()
+	lastModified := editTime.UTC().Format(fcheditLastModifiedValue)
 	character.UpsertCustomData(fcheditLastModifiedKey, lastModified)
 	encoded, err := fch.EncodeBytes(character)
 	if err != nil {
@@ -282,11 +284,13 @@ func (r *editRunner) apply(edit func(*fch.Character) error, summary string) erro
 	}
 
 	if inPlace && !r.noBackup {
-		backup, err := backupFile(r.path)
+		backup, written, err := backupFile(r.path, editTime)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(r.stdout, "backup %s\n", backup)
+		if written {
+			fmt.Fprintf(r.stdout, "backup %s\n", backup)
+		}
 	}
 	if err := writeFile(target, encoded, r.path); err != nil {
 		return fmt.Errorf("write edited character %s: %w", target, err)
@@ -303,34 +307,24 @@ func (r *editRunner) editTime() time.Time {
 	return time.Now()
 }
 
-func backupFile(path string) (string, error) {
+func backupFile(path string, now time.Time) (string, bool, error) {
+	backup := path + ".bak"
+	info, err := os.Stat(backup)
+	if err == nil && !info.ModTime().Before(now.Add(-backupReuseWindow)) {
+		return backup, false, nil
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return "", false, fmt.Errorf("inspect backup path %s: %w", backup, err)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("read backup source %s: %w", path, err)
-	}
-	backup, err := nextBackupPath(path)
-	if err != nil {
-		return "", err
+		return "", false, fmt.Errorf("read backup source %s: %w", path, err)
 	}
 	if err := writeFile(backup, data, path); err != nil {
-		return "", fmt.Errorf("write backup %s: %w", backup, err)
+		return "", false, fmt.Errorf("write backup %s: %w", backup, err)
 	}
-	return backup, nil
-}
-
-func nextBackupPath(path string) (string, error) {
-	for i := 0; ; i++ {
-		candidate := path + ".bak"
-		if i > 0 {
-			candidate = fmt.Sprintf("%s.bak.%d", path, i)
-		}
-		if _, err := os.Stat(candidate); err != nil {
-			if os.IsNotExist(err) {
-				return candidate, nil
-			}
-			return "", fmt.Errorf("inspect backup path %s: %w", candidate, err)
-		}
-	}
+	return backup, true, nil
 }
 
 func writeFile(path string, data []byte, modeFrom string) error {
@@ -367,6 +361,10 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) error {
+	return runTimed(args, stdout, stderr, nil)
+}
+
+func runTimed(args []string, stdout io.Writer, stderr io.Writer, now func() time.Time) error {
 	var cli cli
 	parser, err := kong.New(
 		&cli,
@@ -395,6 +393,7 @@ Examples:
 		dryRun:   cli.DryRun,
 		noBackup: cli.NoBackup,
 		stdout:   stdout,
+		now:      now,
 	}
 	return ctx.Run(runner)
 }

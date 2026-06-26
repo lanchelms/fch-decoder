@@ -99,8 +99,9 @@ docker run --rm -v "$PWD/testdata:/data:ro" \
 
 `fchedit` decodes one character file, applies requested edits, recalculates
 the payload length and trailer hash, and writes the edited file in place by
-default. In-place edits create a numbered `.bak` backup next to the original.
-Use `--out` to write a copy instead.
+default. In-place edits create or replace `character.fch.bak` only when no
+backup for that character was written within the last hour. Use `--out` to write
+a copy instead.
 
 ```sh
 export CHARACTER=character.fch
