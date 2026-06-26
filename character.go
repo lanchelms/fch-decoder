@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 )
 
 const (
@@ -27,6 +28,22 @@ type Character struct {
 	Player          PlayerData  `json:"player"`
 	Trailer         Trailer     `json:"trailer"`
 	RemainingBytes  int         `json:"remainingBytes"`
+}
+
+func NewCharacter(name string, playerID uint64) *Character {
+	playerStats := make([]StatEntry, 105)
+	return &Character{
+		Version:         supportedCharacterVersion,
+		PlayerStatCount: uint32(len(playerStats)),
+		PlayerStats:     playerStats,
+		Map:             MapSection{Raw: []byte{1, 0, 0, 0, 0}},
+		Player: PlayerData{
+			Name:            name,
+			PlayerID:        playerID,
+			DateCreatedUnix: time.Now().Unix(),
+			HasPlayerData:   false,
+		},
+	}
 }
 
 // Validate verifies that the character matches the file shape this package can safely edit.

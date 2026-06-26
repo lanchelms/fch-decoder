@@ -273,7 +273,7 @@ func TestDecodeMinimalCharacterWithoutPlayerData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertMinimalCharacter(t, got)
+	assertMinimalCharacter(t, got, "Minimal Test", 987654321, 1780027200)
 }
 
 func TestDecodeMalformedInputReturnsError(t *testing.T) {
@@ -401,23 +401,7 @@ func minimalMapSection() []byte {
 	return []byte{1, 0, 0, 0, 0}
 }
 
-func minimalCharacter() *Character {
-	playerStats := make([]StatEntry, 105)
-	return &Character{
-		Version:         43,
-		PlayerStatCount: 105,
-		PlayerStats:     playerStats,
-		Map:             MapSection{Raw: minimalMapSection()},
-		Player: PlayerData{
-			Name:            "Minimal Test",
-			PlayerID:        987654321,
-			DateCreatedUnix: 1780027200,
-			HasPlayerData:   false,
-		},
-	}
-}
-
-func assertMinimalCharacter(t *testing.T, got *Character) {
+func assertMinimalCharacter(t *testing.T, got *Character, name string, playerID uint64, dateCreatedUnix int64) {
 	t.Helper()
 
 	if got.Version != 43 {
@@ -438,11 +422,11 @@ func assertMinimalCharacter(t *testing.T, got *Character) {
 	if string(got.Map.Raw) != string(minimalMapSection()) {
 		t.Fatalf("Map.Raw = %v, want %v", got.Map.Raw, minimalMapSection())
 	}
-	if got.Player.Name != "Minimal Test" {
-		t.Fatalf("Name = %q, want Minimal Test", got.Player.Name)
+	if got.Player.Name != name {
+		t.Fatalf("Name = %q, want %q", got.Player.Name, name)
 	}
-	if got.Player.PlayerID != 987654321 {
-		t.Fatalf("PlayerID = %d, want 987654321", got.Player.PlayerID)
+	if got.Player.PlayerID != playerID {
+		t.Fatalf("PlayerID = %d, want %d", got.Player.PlayerID, playerID)
 	}
 	if got.Player.StartSeed != "" {
 		t.Fatalf("StartSeed = %q, want empty", got.Player.StartSeed)
@@ -450,8 +434,8 @@ func assertMinimalCharacter(t *testing.T, got *Character) {
 	if got.Player.UsedCheats {
 		t.Fatal("UsedCheats = true, want false")
 	}
-	if got.Player.DateCreatedUnix != 1780027200 {
-		t.Fatalf("DateCreatedUnix = %d, want 1780027200", got.Player.DateCreatedUnix)
+	if got.Player.DateCreatedUnix != dateCreatedUnix {
+		t.Fatalf("DateCreatedUnix = %d, want %d", got.Player.DateCreatedUnix, dateCreatedUnix)
 	}
 	if !emptyMinimalLists(got.Player) {
 		t.Fatalf("minimal player lists are not empty: %+v", got.Player)

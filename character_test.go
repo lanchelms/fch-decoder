@@ -3,7 +3,33 @@ package fch
 import (
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestNewCharacter(t *testing.T) {
+	before := time.Now().Unix()
+	character := NewCharacter("New Test", 123456)
+	after := time.Now().Unix()
+
+	if character.Version != supportedCharacterVersion {
+		t.Fatalf("Version = %d, want %d", character.Version, supportedCharacterVersion)
+	}
+	if character.PlayerStatCount != 105 || len(character.PlayerStats) != 105 {
+		t.Fatalf("PlayerStats = count %d entries %d, want 105", character.PlayerStatCount, len(character.PlayerStats))
+	}
+	if string(character.Map.Raw) != string(minimalMapSection()) {
+		t.Fatalf("Map.Raw = %v, want %v", character.Map.Raw, minimalMapSection())
+	}
+	if character.Player.Name != "New Test" || character.Player.PlayerID != 123456 {
+		t.Fatalf("player = %q/%d, want New Test/123456", character.Player.Name, character.Player.PlayerID)
+	}
+	if character.Player.DateCreatedUnix < before || character.Player.DateCreatedUnix > after {
+		t.Fatalf("DateCreatedUnix = %d, want between %d and %d", character.Player.DateCreatedUnix, before, after)
+	}
+	if character.Player.HasPlayerData {
+		t.Fatal("HasPlayerData = true, want false")
+	}
+}
 
 func TestCharacterEditMethods(t *testing.T) {
 	character := &Character{}

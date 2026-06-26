@@ -95,7 +95,8 @@ func TestEncodeSyntheticCharacterDecodes(t *testing.T) {
 }
 
 func TestEncodeMinimalCharacterWithoutPlayerData(t *testing.T) {
-	encoded, err := EncodeBytes(minimalCharacter())
+	character := NewCharacter("Minimal Test", 987654321)
+	encoded, err := EncodeBytes(character)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +104,7 @@ func TestEncodeMinimalCharacterWithoutPlayerData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertMinimalCharacter(t, decoded)
+	assertMinimalCharacter(t, decoded, "Minimal Test", 987654321, character.Player.DateCreatedUnix)
 
 	manual := minimalCharacterBytes()
 	decoded, err = DecodeBytes(manual)
