@@ -1,6 +1,7 @@
 package fch
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strings"
@@ -43,28 +44,123 @@ func NewCharacter(name string, playerID uint64) *Character {
 	}
 }
 
-// Validate verifies that the character matches the file shape this package can safely edit.
+func (c *Character) Decode(r *Reader) {
+	c.FileLength = r.u32()
+	c.Version = r.u32()
+	c.PlayerStatCount = r.u32()
+
+	payloadEnd := fileLengthSize + int(c.FileLength)
+	if int(c.PlayerStatCount) > (payloadEnd-r.pos)/4 {
+		panic(fmt.Errorf("fch: player stat count %d exceeds payload size", c.PlayerStatCount))
+	}
+
+	c.PlayerStats = make([]StatEntry, 0, c.PlayerStatCount)
+	for i := 0; i < int(c.PlayerStatCount); i++ {
+		value := r.f32()
+		c.PlayerStats = append(c.PlayerStats, StatEntry{Name: playerStatName(i), Value: value})
+	}
+
+	mapSection, playerOffset, err := readMapSection(r.data, r.pos, payloadEnd)
+	if err != nil {
+		panic(err)
+	}
+	c.Map = mapSection
+
+	pr := NewReader(r.data[playerOffset:payloadEnd])
+	c.Player.Decode(pr)
+	c.HasPlayerData = pr.bool()
+	if c.HasPlayerData {
+		c.PlayerDataLength = pr.u32()
+		c.Player.PlayerState.Decode(pr)
+		c.Player.PlayerTail.Decode(pr)
+	}
+	c.RemainingBytes = pr.remaining()
+	r.pos = payloadEnd
+
+	c.Trailer.Offset = payloadEnd
+	c.Trailer.Length = r.u32()
+	if c.Trailer.Length != payloadHashSize {
+		panic(fmt.Errorf("fch: unexpected trailer hash length %d", c.Trailer.Length))
+	}
+	c.Trailer.Hash = append([]byte(nil), r.bytes(payloadHashSize)...)
+	c.Trailer.HashValid = bytes.Equal(currentPayloadHash(r.data, c.FileLength), c.Trailer.Hash)
+}
+
+func (c Character) Encode(w *Writer) {
+	payload := NewWriter()
+	c.encodePayload(payload)
+	payloadBytes := payload.Data()
+	if len(payloadBytes) > math.MaxUint32 {
+		panic(fmt.Errorf("fch: payload too large: %d bytes", len(payloadBytes)))
+	}
+
+	w.u32(uint32(len(payloadBytes)))
+	w.bytes(payloadBytes)
+	w.u32(payloadHashSize)
+	w.bytes(payloadHash(payloadBytes))
+}
+
+func (c Character) encodePayload(w *Writer) {
+	w.u32(c.Version)
+	w.u32(uint32(len(c.PlayerStats)))
+	for _, stat := range c.PlayerStats {
+		w.f32(stat.Value)
+	}
+	w.bytes(c.Map.Raw)
+	c.Player.Encode(w)
+	c.encodePlayerData(w)
+}
+
+func (c Character) encodePlayerData(w *Writer) {
+	w.bool(c.HasPlayerData)
+	if !c.HasPlayerData {
+		return
+	}
+
+	playerData := NewWriter()
+	c.Player.PlayerState.Encode(playerData)
+	c.Player.PlayerTail.Encode(playerData)
+	data := playerData.Data()
+	if len(data) > math.MaxUint32 {
+		panic(fmt.Errorf("fch: player data too large: %d bytes", len(data)))
+	}
+	w.u32(uint32(len(data)))
+	w.bytes(data)
+}
+
+// Validate verifies that the character is internally consistent and safe to encode.
 func (c *Character) Validate() error {
+	if c == nil {
+		return fmt.Errorf("fch: cannot encode nil character")
+	}
 	if c.Version != supportedCharacterVersion {
 		return fmt.Errorf("unsupported character version %d", c.Version)
+	}
+	if c.PlayerStatCount != uint32(len(c.PlayerStats)) {
+		return fmt.Errorf("fch: player stat count %d does not match %d stats", c.PlayerStatCount, len(c.PlayerStats))
+	}
+	if len(c.Map.Raw) == 0 {
+		return fmt.Errorf("fch: cannot encode character without raw map section")
+	}
+	if c.RemainingBytes != 0 {
+		return fmt.Errorf("decoded character has %d unread player bytes", c.RemainingBytes)
+	}
+	if !c.HasPlayerData {
+		return nil
+	}
+	return c.Player.Validate()
+}
+
+// ValidateEditable verifies that the character matches the decoded file shape this package can safely edit.
+func (c *Character) ValidateEditable() error {
+	if err := c.Validate(); err != nil {
+		return err
 	}
 	if !c.Trailer.HashValid {
 		return fmt.Errorf("invalid trailer hash")
 	}
 	if !c.HasPlayerData {
 		return fmt.Errorf("missing player data")
-	}
-	if c.Player.PlayerVersion != supportedPlayerVersion {
-		return fmt.Errorf("unsupported player version %d", c.Player.PlayerVersion)
-	}
-	if c.Player.InventoryVersion != supportedInventoryVersion {
-		return fmt.Errorf("unsupported inventory version %d", c.Player.InventoryVersion)
-	}
-	if c.Player.SkillVersion != supportedSkillVersion {
-		return fmt.Errorf("unsupported skill version %d", c.Player.SkillVersion)
-	}
-	if c.RemainingBytes != 0 {
-		return fmt.Errorf("decoded character has %d unread player bytes", c.RemainingBytes)
 	}
 	return nil
 }

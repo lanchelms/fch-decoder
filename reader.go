@@ -7,23 +7,23 @@ import (
 	"math"
 )
 
-type reader struct {
+type Reader struct {
 	data []byte
 	pos  int
 }
 
-func newReader(data []byte) *reader {
-	return &reader{data: data}
+func NewReader(data []byte) *Reader {
+	return &Reader{data: data}
 }
 
-func (r *reader) remaining() int {
+func (r *Reader) remaining() int {
 	if r.pos >= len(r.data) {
 		return 0
 	}
 	return len(r.data) - r.pos
 }
 
-func (r *reader) capacity(count uint32) int {
+func (r *Reader) capacity(count uint32) int {
 	capacity := int(count)
 	if capacity > r.remaining() {
 		return r.remaining()
@@ -31,11 +31,11 @@ func (r *reader) capacity(count uint32) int {
 	return capacity
 }
 
-func (r *reader) need(n int) bool {
+func (r *Reader) need(n int) bool {
 	return n >= 0 && r.pos+n <= len(r.data)
 }
 
-func (r *reader) bytes(n int) []byte {
+func (r *Reader) bytes(n int) []byte {
 	if !r.need(n) {
 		panic(io.ErrUnexpectedEOF)
 	}
@@ -44,41 +44,37 @@ func (r *reader) bytes(n int) []byte {
 	return b
 }
 
-func (r *reader) u32() uint32 {
+func (r *Reader) u32() uint32 {
 	return binary.LittleEndian.Uint32(r.bytes(4))
 }
 
-func (r *reader) i32() int32 {
+func (r *Reader) i32() int32 {
 	return int32(r.u32())
 }
 
-func (r *reader) u64() uint64 {
+func (r *Reader) u64() uint64 {
 	return binary.LittleEndian.Uint64(r.bytes(8))
 }
 
-func (r *reader) f32() float32 {
+func (r *Reader) f32() float32 {
 	return math.Float32frombits(r.u32())
 }
 
-func (r *reader) bool() bool {
+func (r *Reader) bool() bool {
 	return r.byte() != 0
 }
 
-func (r *reader) byte() byte {
+func (r *Reader) byte() byte {
 	return r.bytes(1)[0]
 }
 
-func (r *reader) str() string {
+func (r *Reader) str() string {
 	n := r.read7BitEncodedInt()
 	b := r.bytes(n)
 	return string(b)
 }
 
-func (r *reader) vector3() Vector3 {
-	return Vector3{X: r.f32(), Y: r.f32(), Z: r.f32()}
-}
-
-func (r *reader) read7BitEncodedInt() int {
+func (r *Reader) read7BitEncodedInt() int {
 	var count uint32
 	var shift uint
 	for shift != 35 {

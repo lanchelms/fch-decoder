@@ -7,7 +7,7 @@ import (
 )
 
 func TestWriterPrimitives(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	w.u32(0x12345678)
 	w.i32(-1)
@@ -26,16 +26,16 @@ func TestWriterPrimitives(t *testing.T) {
 		0x00,
 		0xab,
 	}
-	if got := w.data(); !bytes.Equal(got, want) {
+	if got := w.Data(); !bytes.Equal(got, want) {
 		t.Fatalf("data = % x, want % x", got, want)
 	}
-	if got := w.len(); got != len(want) {
+	if got := w.Len(); got != len(want) {
 		t.Fatalf("len = %d, want %d", got, len(want))
 	}
 }
 
 func TestWriterRoundTripsReaderPrimitives(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	w.u32(0x12345678)
 	w.i32(-12345)
@@ -44,9 +44,9 @@ func TestWriterRoundTripsReaderPrimitives(t *testing.T) {
 	w.bool(true)
 	w.bool(false)
 	w.byte(0xcd)
-	w.vector3(Vector3{X: 1.25, Y: -2.5, Z: 3.75})
+	Vector3{X: 1.25, Y: -2.5, Z: 3.75}.Encode(w)
 
-	r := newReader(w.data())
+	r := NewReader(w.Data())
 	if got := r.u32(); got != 0x12345678 {
 		t.Fatalf("u32 = %#x, want 0x12345678", got)
 	}
@@ -68,8 +68,10 @@ func TestWriterRoundTripsReaderPrimitives(t *testing.T) {
 	if got := r.byte(); got != 0xcd {
 		t.Fatalf("byte = %#x, want 0xcd", got)
 	}
-	if got := r.vector3(); got != (Vector3{X: 1.25, Y: -2.5, Z: 3.75}) {
-		t.Fatalf("vector3 = %#v, want 1.25/-2.5/3.75", got)
+	var gotVector Vector3
+	gotVector.Decode(r)
+	if gotVector != (Vector3{X: 1.25, Y: -2.5, Z: 3.75}) {
+		t.Fatalf("vector3 = %#v, want 1.25/-2.5/3.75", gotVector)
 	}
 	if got := r.remaining(); got != 0 {
 		t.Fatalf("remaining = %d, want 0", got)
@@ -77,18 +79,18 @@ func TestWriterRoundTripsReaderPrimitives(t *testing.T) {
 }
 
 func TestWriterString(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	w.str("hello")
 	w.str("")
 	w.str("ok")
 
 	want := []byte{0x05, 'h', 'e', 'l', 'l', 'o', 0x00, 0x02, 'o', 'k'}
-	if got := w.data(); !bytes.Equal(got, want) {
+	if got := w.Data(); !bytes.Equal(got, want) {
 		t.Fatalf("data = % x, want % x", got, want)
 	}
 
-	r := newReader(w.data())
+	r := NewReader(w.Data())
 	if got := r.str(); got != "hello" {
 		t.Fatalf("first str = %q, want hello", got)
 	}
@@ -115,10 +117,10 @@ func TestWriterString7BitLengthBoundaries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newWriter()
+			w := NewWriter()
 			w.str(string(bytesOf('x', tt.length)))
 
-			got := w.data()
+			got := w.Data()
 			if !bytes.HasPrefix(got, tt.wantPrefix) {
 				t.Fatalf("prefix = % x, want % x", got[:len(tt.wantPrefix)], tt.wantPrefix)
 			}
@@ -126,7 +128,7 @@ func TestWriterString7BitLengthBoundaries(t *testing.T) {
 				t.Fatalf("encoded length = %d, want %d", len(got), len(tt.wantPrefix)+tt.length)
 			}
 
-			r := newReader(got)
+			r := NewReader(got)
 			if got := len(r.str()); got != tt.length {
 				t.Fatalf("round-trip string length = %d, want %d", got, tt.length)
 			}
@@ -139,81 +141,81 @@ func TestWriterString7BitLengthBoundaries(t *testing.T) {
 
 func TestWriterBytesAppendsCopy(t *testing.T) {
 	src := []byte{0x01, 0x02}
-	w := newWriter()
+	w := NewWriter()
 
 	w.bytes(src)
 	src[0] = 0xff
 
-	if got, want := w.data(), []byte{0x01, 0x02}; !bytes.Equal(got, want) {
+	if got, want := w.Data(), []byte{0x01, 0x02}; !bytes.Equal(got, want) {
 		t.Fatalf("data = % x, want % x", got, want)
 	}
 }
 
 func TestWriterDataReturnsCopy(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 	w.bytes([]byte{0x01, 0x02})
 
-	got := w.data()
+	got := w.Data()
 	got[0] = 0xff
 
-	if got, want := w.data(), []byte{0x01, 0x02}; !bytes.Equal(got, want) {
+	if got, want := w.Data(), []byte{0x01, 0x02}; !bytes.Equal(got, want) {
 		t.Fatalf("data after caller mutation = % x, want % x", got, want)
 	}
 }
 
 func TestWriterFloatPreservesBits(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 	nan := math.Float32frombits(0x7fc00000)
 
 	w.f32(nan)
 
-	got := w.data()
+	got := w.Data()
 	want := []byte{0x00, 0x00, 0xc0, 0x7f}
 	if !bytes.Equal(got, want) {
 		t.Fatalf("data = % x, want % x", got, want)
 	}
-	if got := math.Float32bits(newReader(got).f32()); got != 0x7fc00000 {
+	if got := math.Float32bits(NewReader(got).f32()); got != 0x7fc00000 {
 		t.Fatalf("round-trip bits = %#x, want 0x7fc00000", got)
 	}
 }
 
 func TestWriterRejectsNegative7BitEncodedInt(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	err := mustPanic(t, func() { w.write7BitEncodedInt(-1) })
 	if err == nil || err.Error() != "fch: invalid negative 7-bit encoded integer -1" {
 		t.Fatalf("panic = %v, want invalid negative 7-bit encoded integer", err)
 	}
-	if got := w.len(); got != 0 {
+	if got := w.Len(); got != 0 {
 		t.Fatalf("len = %d, want 0 after failed write", got)
 	}
 }
 
 func TestWriterRejectsOversized7BitEncodedInt(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	err := mustPanic(t, func() { w.write7BitEncodedInt(max7BitEncodedInt + 1) })
 	if err == nil || err.Error() != "fch: invalid oversized 7-bit encoded integer 2147483648" {
 		t.Fatalf("panic = %v, want invalid oversized 7-bit encoded integer", err)
 	}
-	if got := w.len(); got != 0 {
+	if got := w.Len(); got != 0 {
 		t.Fatalf("len = %d, want 0 after failed write", got)
 	}
 }
 
 func TestWriterMax7BitEncodedInt(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	w.write7BitEncodedInt(max7BitEncodedInt)
 
 	want := []byte{0xff, 0xff, 0xff, 0xff, 0x07}
-	if got := w.data(); !bytes.Equal(got, want) {
+	if got := w.Data(); !bytes.Equal(got, want) {
 		t.Fatalf("data = % x, want % x", got, want)
 	}
 }
 
 func TestWriterOutputMatchesReaderFixture(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 
 	w.u32(0x12345678)
 	w.i32(-1)
@@ -230,7 +232,7 @@ func TestWriterOutputMatchesReaderFixture(t *testing.T) {
 		0x01,
 		0xab,
 	}
-	if !bytes.Equal(w.data(), want) {
-		t.Fatalf("writer fixture = % x, want reader fixture % x", w.data(), want)
+	if !bytes.Equal(w.Data(), want) {
+		t.Fatalf("Writer fixture = % x, want Reader fixture % x", w.Data(), want)
 	}
 }

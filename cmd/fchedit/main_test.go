@@ -584,9 +584,11 @@ func TestListInventoryAlignsColumns(t *testing.T) {
 	runner := &editRunner{stdout: &bytes.Buffer{}}
 	character := &fch.Character{
 		Player: fch.Player{
-			Inventory: []fch.Item{
-				{Name: "Wood", Stack: 1, Quality: 1, Durability: 1},
-				{Name: "ReallyLongInventoryItemName", Stack: 2, Quality: 3, Durability: 4},
+			PlayerState: fch.PlayerState{
+				Inventory: []fch.Item{
+					{Name: "Wood", Stack: 1, Quality: 1, Durability: 1},
+					{Name: "ReallyLongInventoryItemName", Stack: 2, Quality: 3, Durability: 4},
+				},
 			},
 		},
 	}
@@ -686,13 +688,10 @@ func TestRunRejectsUnsupportedVersions(t *testing.T) {
 			in := copyFixture(t, "Steam_333333_tugen.fch")
 			character := decodeFile(t, in)
 			tt.edit(character)
-			data, err := fch.EncodeBytes(character)
-			if err != nil {
-				t.Fatal(err)
-			}
+			data := encodeUnchecked(character)
 			writeTestFile(t, in, data)
 
-			err = run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+			err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("run error = %v, want %q", err, tt.want)
 			}
@@ -768,6 +767,12 @@ func insertPayloadBytes(data []byte, offset int, inserted []byte) []byte {
 	hash := sha512.Sum512(out[4 : 4+payloadLen])
 	copy(out[8+payloadLen:], hash[:])
 	return out
+}
+
+func encodeUnchecked(character *fch.Character) []byte {
+	w := fch.NewWriter()
+	character.Encode(w)
+	return w.Data()
 }
 
 func findItem(items []fch.Item, name string) *fch.Item {

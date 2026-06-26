@@ -206,20 +206,6 @@ func TestCharacterValidateRejectsUnexpectedShape(t *testing.T) {
 			want: "unsupported character version 44",
 		},
 		{
-			name: "trailer hash",
-			edit: func(character *Character) {
-				character.Trailer.HashValid = false
-			},
-			want: "invalid trailer hash",
-		},
-		{
-			name: "player data",
-			edit: func(character *Character) {
-				character.HasPlayerData = false
-			},
-			want: "missing player data",
-		},
-		{
 			name: "player version",
 			edit: func(character *Character) {
 				character.Player.PlayerVersion++
@@ -257,6 +243,41 @@ func TestCharacterValidateRejectsUnexpectedShape(t *testing.T) {
 			err := character.Validate()
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("Validate error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestCharacterValidateEditableRejectsUnexpectedShape(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*Character)
+		want string
+	}{
+		{
+			name: "trailer hash",
+			edit: func(character *Character) {
+				character.Trailer.HashValid = false
+			},
+			want: "invalid trailer hash",
+		},
+		{
+			name: "player data",
+			edit: func(character *Character) {
+				character.HasPlayerData = false
+			},
+			want: "missing player data",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			character := validCharacter()
+			tt.edit(character)
+
+			err := character.ValidateEditable()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("ValidateEditable error = %v, want %q", err, tt.want)
 			}
 		})
 	}

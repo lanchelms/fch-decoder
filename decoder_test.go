@@ -326,8 +326,8 @@ func FuzzDecodeEncode(f *testing.F) {
 }
 
 func TestReadInventoryCustomData(t *testing.T) {
-	encoded := newEncoder()
-	encoded.inventory([]Item{{
+	w := NewWriter()
+	writeList(w, []Item{{
 		Name:        "Hammer",
 		Stack:       2,
 		Durability:  3.5,
@@ -346,7 +346,7 @@ func TestReadInventoryCustomData(t *testing.T) {
 		PickedUp:   true,
 	}})
 
-	got := readInventory(newReader(encoded.w.data()))
+	got := readList[Item](NewReader(w.Data()))
 	if len(got) != 1 {
 		t.Fatalf("Inventory = %d, want 1", len(got))
 	}

@@ -8,27 +8,25 @@ import (
 )
 
 func TestReadList(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 	w.u32(2)
-	w.u32(10)
-	w.u32(20)
+	StatEntry{Name: "one", Value: 10}.Encode(w)
+	StatEntry{Name: "two", Value: 20}.Encode(w)
 
-	got := readList(newReader(w.data()), func(r *reader) uint32 {
-		return r.u32()
-	})
-	want := []uint32{10, 20}
+	got := readList[StatEntry](NewReader(w.Data()))
+	want := []StatEntry{{Name: "one", Value: 10}, {Name: "two", Value: 20}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("readList = %#v, want %#v", got, want)
 	}
 }
 
 func TestReadListStrings(t *testing.T) {
-	w := newWriter()
+	w := NewWriter()
 	w.u32(2)
 	w.str("one")
 	w.str("two")
 
-	got := readList(newReader(w.data()), str)
+	got := readStringList(NewReader(w.Data()))
 	want := []string{"one", "two"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("readList strings = %#v, want %#v", got, want)
@@ -38,98 +36,98 @@ func TestReadListStrings(t *testing.T) {
 func TestListReaders(t *testing.T) {
 	tests := []struct {
 		name  string
-		write func(*writer)
-		read  func(*reader) any
+		write func(*Writer)
+		read  func(*Reader) any
 		want  any
 	}{
 		{
 			name: "statEntry",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("Kills")
 				w.f32(12.5)
 			},
-			read: func(r *reader) any { return statEntry(r) },
+			read: func(r *Reader) any { return readValue[StatEntry, *StatEntry](r) },
 			want: StatEntry{Name: "Kills", Value: 12.5},
 		},
 		{
 			name: "timedEntry",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("World")
 				w.f32(42)
 			},
-			read: func(r *reader) any { return timedEntry(r) },
+			read: func(r *Reader) any { return readValue[TimedEntry, *TimedEntry](r) },
 			want: TimedEntry{Name: "World", Seconds: 42},
 		},
 		{
 			name: "textEntry",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("key")
 				w.str("value")
 			},
-			read: func(r *reader) any { return textEntry(r) },
+			read: func(r *Reader) any { return readValue[TextEntry, *TextEntry](r) },
 			want: TextEntry{Key: "key", Value: "value"},
 		},
 		{
 			name: "station",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("Workbench")
 				w.u32(3)
 			},
-			read: func(r *reader) any { return station(r) },
+			read: func(r *Reader) any { return readValue[Station, *Station](r) },
 			want: Station{Name: "Workbench", Level: 3},
 		},
 		{
 			name: "biome",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.u32(7)
 			},
-			read: func(r *reader) any { return biome(r) },
-			want: uint32(7),
+			read: func(r *Reader) any { return readValue[Biome, *Biome](r) },
+			want: Biome(7),
 		},
 		{
 			name: "food",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("CarrotSoup")
 				w.f32(693)
 			},
-			read: func(r *reader) any { return food(r) },
+			read: func(r *Reader) any { return readValue[Food, *Food](r) },
 			want: Food{Name: "CarrotSoup", Time: 693},
 		},
 		{
 			name: "skill",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.u32(105)
 				w.f32(24.75)
 				w.f32(0.5)
 			},
-			read: func(r *reader) any { return skill(r) },
+			read: func(r *Reader) any { return readValue[Skill, *Skill](r) },
 			want: Skill{Type: 105, Name: "Cooking", Level: 24.75, DisplayLevel: 24, Accumulator: 0.5},
 		},
 		{
 			name: "worldKeyRaw",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("nomap")
 				w.f32(7)
 			},
-			read: func(r *reader) any { return worldKey(r) },
+			read: func(r *Reader) any { return readValue[WorldKey, *WorldKey](r) },
 			want: WorldKey{Raw: "nomap", Seconds: 7},
 		},
 		{
 			name: "worldKeySplit",
-			write: func(w *writer) {
+			write: func(w *Writer) {
 				w.str("PlayerDamage default")
 				w.f32(1375)
 			},
-			read: func(r *reader) any { return worldKey(r) },
+			read: func(r *Reader) any { return readValue[WorldKey, *WorldKey](r) },
 			want: WorldKey{Raw: "PlayerDamage default", Key: "PlayerDamage", Setting: "default", Seconds: 1375},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := newWriter()
+			w := NewWriter()
 			tt.write(w)
-			got := tt.read(newReader(w.data()))
+			got := tt.read(NewReader(w.Data()))
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("%s = %#v, want %#v", tt.name, got, tt.want)
 			}
@@ -174,7 +172,7 @@ func TestDecodeConvertedListsFromSample(t *testing.T) {
 	if got := p.KnownStations[0]; got != (Station{Name: "$piece_workbench", Level: 4}) {
 		t.Fatalf("KnownStations[0] = %+v", got)
 	}
-	if got := p.KnownBiomes[0]; got != uint32(1) {
+	if got := p.KnownBiomes[0]; got != Biome(1) {
 		t.Fatalf("KnownBiomes[0] = %d", got)
 	}
 	if got := p.PlayerKnownTexts[0]; got != (TextEntry{Key: "$tutorial_workbench_label", Value: "$tutorial_workbench_text"}) {

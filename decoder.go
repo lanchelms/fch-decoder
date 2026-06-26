@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
+	"strings"
 )
 
 const (
@@ -12,6 +14,10 @@ const (
 	trailerSize    = 68
 	fileOverhead   = fileLengthSize + trailerSize
 )
+
+type decoder interface {
+	Decode(*Reader)
+}
 
 type MapSection struct {
 	Offset           int    `json:"offset"`
@@ -32,9 +38,29 @@ type StatEntry struct {
 	Value float32 `json:"value"`
 }
 
+func (s *StatEntry) Decode(r *Reader) {
+	s.Name = r.str()
+	s.Value = r.f32()
+}
+
+func (s StatEntry) Encode(w *Writer) {
+	w.str(s.Name)
+	w.f32(s.Value)
+}
+
 type TimedEntry struct {
 	Name    string  `json:"name"`
 	Seconds float32 `json:"seconds"`
+}
+
+func (t *TimedEntry) Decode(r *Reader) {
+	t.Name = r.str()
+	t.Seconds = r.f32()
+}
+
+func (t TimedEntry) Encode(w *Writer) {
+	w.str(t.Name)
+	w.f32(t.Seconds)
 }
 
 type WorldKey struct {
@@ -44,9 +70,43 @@ type WorldKey struct {
 	Seconds float32 `json:"seconds"`
 }
 
+func NewWorldKey(raw string, seconds float32) WorldKey {
+	key, setting, ok := strings.Cut(raw, " ")
+	if !ok {
+		return WorldKey{Raw: raw, Seconds: seconds}
+	}
+	return WorldKey{Raw: raw, Key: key, Setting: setting, Seconds: seconds}
+}
+
+func (wk *WorldKey) Decode(r *Reader) {
+	*wk = NewWorldKey(r.str(), r.f32())
+}
+
+func (wk WorldKey) Encode(w *Writer) {
+	raw := wk.Raw
+	if raw == "" {
+		raw = wk.Key
+		if wk.Setting != "" {
+			raw += " " + wk.Setting
+		}
+	}
+	w.str(raw)
+	w.f32(wk.Seconds)
+}
+
 type TextEntry struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+func (t *TextEntry) Decode(r *Reader) {
+	t.Key = r.str()
+	t.Value = r.str()
+}
+
+func (t TextEntry) Encode(w *Writer) {
+	w.str(t.Key)
+	w.str(t.Value)
 }
 
 type Station struct {
@@ -54,9 +114,39 @@ type Station struct {
 	Level uint32 `json:"level"`
 }
 
+func (s *Station) Decode(r *Reader) {
+	s.Name = r.str()
+	s.Level = r.u32()
+}
+
+func (s Station) Encode(w *Writer) {
+	w.str(s.Name)
+	w.u32(s.Level)
+}
+
 type Food struct {
 	Name string  `json:"name"`
 	Time float32 `json:"time"`
+}
+
+func (f *Food) Decode(r *Reader) {
+	f.Name = r.str()
+	f.Time = r.f32()
+}
+
+func (f Food) Encode(w *Writer) {
+	w.str(f.Name)
+	w.f32(f.Time)
+}
+
+type Biome uint32
+
+func (b *Biome) Decode(r *Reader) {
+	*b = Biome(r.u32())
+}
+
+func (b Biome) Encode(w *Writer) {
+	w.u32(uint32(b))
 }
 
 type Vector3 struct {
@@ -65,9 +155,31 @@ type Vector3 struct {
 	Z float32 `json:"z"`
 }
 
+func (v *Vector3) Decode(r *Reader) {
+	v.X = r.f32()
+	v.Y = r.f32()
+	v.Z = r.f32()
+}
+
+func (v Vector3) Encode(w *Writer) {
+	w.f32(v.X)
+	w.f32(v.Y)
+	w.f32(v.Z)
+}
+
 type GuardianPower struct {
 	Name     string  `json:"name"`
 	Cooldown float32 `json:"cooldown"`
+}
+
+func (g *GuardianPower) Decode(r *Reader) {
+	g.Name = r.str()
+	g.Cooldown = r.f32()
+}
+
+func (g GuardianPower) Encode(w *Writer) {
+	w.str(g.Name)
+	w.f32(g.Cooldown)
 }
 
 type Skill struct {
@@ -76,6 +188,24 @@ type Skill struct {
 	Level        float32 `json:"level"`
 	DisplayLevel int32   `json:"displayLevel"`
 	Accumulator  float32 `json:"accumulator"`
+}
+
+func (s *Skill) Decode(r *Reader) {
+	s.Type = r.i32()
+	s.Name = skillName(s.Type)
+	s.Level = r.f32()
+	s.DisplayLevel = s.displayLevel()
+	s.Accumulator = r.f32()
+}
+
+func (s Skill) Encode(w *Writer) {
+	w.i32(s.Type)
+	w.f32(s.Level)
+	w.f32(s.Accumulator)
+}
+
+func (s Skill) displayLevel() int32 {
+	return int32(math.Floor(float64(s.Level)))
 }
 
 type Item struct {
@@ -92,6 +222,38 @@ type Item struct {
 	CustomData  []TextEntry `json:"customData,omitempty"`
 	WorldLevel  uint32      `json:"worldLevel"`
 	PickedUp    bool        `json:"pickedUp"`
+}
+
+func (i *Item) Decode(r *Reader) {
+	i.Name = r.str()
+	i.Stack = r.i32()
+	i.Durability = r.f32()
+	i.GridX = r.i32()
+	i.GridY = r.i32()
+	i.Equipped = r.bool()
+	i.Quality = r.i32()
+	i.Variant = r.i32()
+	i.CrafterID = r.u64()
+	i.CrafterName = r.str()
+	i.CustomData = readList[TextEntry](r)
+	i.WorldLevel = r.u32()
+	i.PickedUp = r.bool()
+}
+
+func (i Item) Encode(w *Writer) {
+	w.str(i.Name)
+	w.i32(i.Stack)
+	w.f32(i.Durability)
+	w.i32(i.GridX)
+	w.i32(i.GridY)
+	w.bool(i.Equipped)
+	w.i32(i.Quality)
+	w.i32(i.Variant)
+	w.u64(i.CrafterID)
+	w.str(i.CrafterName)
+	writeList(w, i.CustomData)
+	w.u32(i.WorldLevel)
+	w.bool(i.PickedUp)
 }
 
 func Decode(r io.Reader) (*Character, error) {
@@ -114,50 +276,17 @@ func DecodeBytes(data []byte) (character *Character, err error) {
 		return nil, fmt.Errorf("fch: file too short: %d bytes", len(data))
 	}
 
-	rd := newReader(data)
+	rd := NewReader(data)
 	c := &Character{}
 	c.FileLength = rd.u32()
 	c.Version = rd.u32()
 	c.PlayerStatCount = rd.u32()
-	payloadEnd := fileLengthSize + int(c.FileLength)
 	if int(c.FileLength)+fileOverhead != len(data) {
 		return nil, fmt.Errorf("fch: length header %d does not match file size %d", c.FileLength, len(data))
 	}
-	if int(c.PlayerStatCount) > (payloadEnd-rd.pos)/4 {
-		return nil, fmt.Errorf("fch: player stat count %d exceeds payload size", c.PlayerStatCount)
-	}
 
-	c.PlayerStats = make([]StatEntry, 0, c.PlayerStatCount)
-	for i := 0; i < int(c.PlayerStatCount); i++ {
-		value := rd.f32()
-		c.PlayerStats = append(c.PlayerStats, StatEntry{Name: playerStatName(i), Value: value})
-	}
-
-	mapSection, playerOffset, err := readMapSection(data, rd.pos, payloadEnd)
-	if err != nil {
-		return nil, err
-	}
-	c.Map = mapSection
-
-	pr := newReader(data[playerOffset:payloadEnd])
-	player, hasPlayerData, playerDataLength, err := decodePlayer(pr)
-	if err != nil {
-		return nil, fmt.Errorf("fch: player section at offset %d: %w", playerOffset+pr.pos, err)
-	}
-	c.Player = player
-	c.HasPlayerData = hasPlayerData
-	c.PlayerDataLength = playerDataLength
-	c.RemainingBytes = pr.remaining()
-
-	trailerOffset := payloadEnd
-	tr := newReader(data[trailerOffset:])
-	c.Trailer.Offset = trailerOffset
-	c.Trailer.Length = tr.u32()
-	if c.Trailer.Length != 64 {
-		return nil, fmt.Errorf("fch: unexpected trailer hash length %d", c.Trailer.Length)
-	}
-	c.Trailer.Hash = append([]byte(nil), tr.bytes(64)...)
-	c.Trailer.HashValid = bytes.Equal(currentPayloadHash(data, c.FileLength), c.Trailer.Hash)
+	rd = NewReader(data)
+	c.Decode(rd)
 	return c, nil
 }
 
@@ -204,105 +333,4 @@ func readMapPrefix(data []byte, startOffset int, payloadEnd int) (byte, uint32, 
 	firstSpawn := data[startOffset]
 	worldCount := binary.LittleEndian.Uint32(data[startOffset+1 : startOffset+5])
 	return firstSpawn, worldCount, true
-}
-
-func decodePlayer(r *reader) (Player, bool, uint32, error) {
-	var p Player
-	p.Name = r.str()
-	p.PlayerID = r.u64()
-	p.StartSeed = r.str()
-	p.UsedCheats = r.bool()
-	p.DateCreatedUnix = int64(r.u64())
-
-	p.KnownWorlds = readList(r, timedEntry)
-	p.KnownWorldKeys = readList(r, worldKey)
-	p.KnownCommands = readList(r, statEntry)
-	p.EnemyStats = readList(r, statEntry)
-	p.MaterialStats = readList(r, statEntry)
-	p.RecipeStats = readList(r, statEntry)
-	hasPlayerData, playerDataLength := readPlayerState(r, &p)
-	if !hasPlayerData {
-		return p, hasPlayerData, playerDataLength, nil
-	}
-	p.Inventory = readInventory(r)
-	readPlayerTail(r, &p)
-	return p, hasPlayerData, playerDataLength, nil
-}
-
-func readPlayerTail(r *reader, p *Player) {
-	p.KnownRecipes = readList(r, str)
-	p.KnownStations = readList(r, station)
-	p.KnownMaterials = readList(r, str)
-	p.ShownTutorials = readList(r, str)
-	p.Uniques = readList(r, str)
-	p.Trophies = readList(r, str)
-
-	p.KnownBiomes = readList(r, biome)
-
-	p.PlayerKnownTexts = readList(r, textEntry)
-
-	p.Beard = r.str()
-	p.Hair = r.str()
-	p.SkinColor = r.vector3()
-	p.HairColor = r.vector3()
-	p.ModelIndex = r.u32()
-
-	p.Foods = readList(r, food)
-
-	p.SkillVersion = r.u32()
-	p.Skills = readList(r, skill)
-
-	p.CustomData = readList(r, textEntry)
-	if r.remaining() >= 8 {
-		p.Stamina = r.f32()
-		p.MaxEitr = r.f32()
-		p.tailFloatCount = 2
-	}
-	if r.remaining() >= 4 {
-		p.Eitr = r.f32()
-		p.tailFloatCount = 3
-	}
-}
-
-func readPlayerState(r *reader, p *Player) (bool, uint32) {
-	hasPlayerData := r.bool()
-	if !hasPlayerData {
-		return false, 0
-	}
-	playerDataLength := r.u32()
-	p.PlayerVersion = r.u32()
-	p.MaxHealth = r.f32()
-	p.Health = r.f32()
-	p.MaxStamina = r.f32()
-	p.TimeSinceDeath = r.f32()
-	p.GuardianPower = GuardianPower{
-		Name:     r.str(),
-		Cooldown: r.f32(),
-	}
-	p.InventoryVersion = r.u32()
-	return true, playerDataLength
-}
-
-func readInventory(r *reader) []Item {
-	count := r.u32()
-	out := make([]Item, 0, r.capacity(count))
-	for range count {
-		item := Item{
-			Name:        r.str(),
-			Stack:       r.i32(),
-			Durability:  r.f32(),
-			GridX:       r.i32(),
-			GridY:       r.i32(),
-			Equipped:    r.bool(),
-			Quality:     r.i32(),
-			Variant:     r.i32(),
-			CrafterID:   r.u64(),
-			CrafterName: r.str(),
-		}
-		item.CustomData = readList(r, textEntry)
-		item.WorldLevel = r.u32()
-		item.PickedUp = r.bool()
-		out = append(out, item)
-	}
-	return out
 }

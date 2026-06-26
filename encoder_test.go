@@ -148,7 +148,7 @@ func TestEncodeWritesToWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := buf.Bytes(); !bytes.Equal(got, want) {
-		t.Fatalf("Encode writer bytes differ from EncodeBytes")
+		t.Fatalf("Encode Writer bytes differ from EncodeBytes")
 	}
 }
 
@@ -301,75 +301,79 @@ func syntheticCharacter() *Character {
 			RecipeStats: []StatEntry{
 				{Name: "Hammer", Value: 5},
 			},
-			PlayerVersion:  29,
-			MaxHealth:      100,
-			Health:         75,
-			MaxStamina:     120,
-			Stamina:        84,
-			MaxEitr:        50,
-			Eitr:           25,
-			TimeSinceDeath: 6,
-			GuardianPower: GuardianPower{
-				Name:     "GP_Eikthyr",
-				Cooldown: 7,
-			},
-			InventoryVersion: 106,
-			Inventory: []Item{
-				{
-					Name:        "Hammer",
-					Stack:       1,
-					Durability:  99,
-					GridX:       2,
-					GridY:       3,
-					Equipped:    true,
-					Quality:     4,
-					Variant:     5,
-					CrafterID:   6,
-					CrafterName: "Crafter",
-					CustomData: []TextEntry{
-						{Key: "crafter", Value: "yes"},
+			PlayerState: PlayerState{
+				PlayerVersion:  29,
+				MaxHealth:      100,
+				Health:         75,
+				MaxStamina:     120,
+				TimeSinceDeath: 6,
+				GuardianPower: GuardianPower{
+					Name:     "GP_Eikthyr",
+					Cooldown: 7,
+				},
+				InventoryVersion: 106,
+				Inventory: []Item{
+					{
+						Name:        "Hammer",
+						Stack:       1,
+						Durability:  99,
+						GridX:       2,
+						GridY:       3,
+						Equipped:    true,
+						Quality:     4,
+						Variant:     5,
+						CrafterID:   6,
+						CrafterName: "Crafter",
+						CustomData: []TextEntry{
+							{Key: "crafter", Value: "yes"},
+						},
+						WorldLevel: 7,
+						PickedUp:   true,
 					},
-					WorldLevel: 7,
-					PickedUp:   true,
 				},
 			},
-			KnownRecipes: []string{"Hammer"},
-			KnownStations: []Station{
-				{Name: "piece_workbench", Level: 2},
-			},
-			KnownMaterials: []string{"Wood"},
-			ShownTutorials: []string{"tutorial"},
-			Uniques:        []string{"unique"},
-			Trophies:       []string{"TrophyDeer"},
-			KnownBiomes:    []uint32{1},
-			PlayerKnownTexts: []TextEntry{
-				{Key: "raven", Value: "text"},
-			},
-			Beard:      "Beard1",
-			Hair:       "Hair1",
-			SkinColor:  Vector3{X: 0.1, Y: 0.2, Z: 0.3},
-			HairColor:  Vector3{X: 0.4, Y: 0.5, Z: 0.6},
-			ModelIndex: 1,
-			Foods: []Food{
-				{Name: "CookedMeat", Time: 10},
-			},
-			SkillVersion: 2,
-			Skills: []Skill{
-				{Type: 1, Level: 12.75, Accumulator: 0.5},
-			},
-			CustomData: []TextEntry{
-				{Key: "custom", Value: "data"},
+			PlayerTail: PlayerTail{
+				KnownRecipes: []string{"Hammer"},
+				KnownStations: []Station{
+					{Name: "piece_workbench", Level: 2},
+				},
+				KnownMaterials: []string{"Wood"},
+				ShownTutorials: []string{"tutorial"},
+				Uniques:        []string{"unique"},
+				Trophies:       []string{"TrophyDeer"},
+				KnownBiomes:    []Biome{1},
+				PlayerKnownTexts: []TextEntry{
+					{Key: "raven", Value: "text"},
+				},
+				Beard:        "Beard1",
+				Hair:         "Hair1",
+				SkinColor:    Vector3{X: 0.1, Y: 0.2, Z: 0.3},
+				HairColor:    Vector3{X: 0.4, Y: 0.5, Z: 0.6},
+				ModelIndex:   1,
+				SkillVersion: 2,
+				Foods: []Food{
+					{Name: "CookedMeat", Time: 10},
+				},
+				Skills: []Skill{
+					{Type: 1, Level: 12.75, Accumulator: 0.5},
+				},
+				CustomData: []TextEntry{
+					{Key: "custom", Value: "data"},
+				},
+				Stamina: 84,
+				MaxEitr: 50,
+				Eitr:    25,
 			},
 		},
 	}
 }
 
 func syntheticMapSection() []byte {
-	w := newWriter()
+	w := NewWriter()
 	w.u32(3)
 	w.u32(0)
 	w.u32(3)
-	raw := w.data()
+	raw := w.Data()
 	return append(raw, 0x1f, 0x8b, 0x08)
 }
 

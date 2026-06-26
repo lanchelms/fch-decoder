@@ -8,7 +8,7 @@ import (
 )
 
 func TestReaderPrimitives(t *testing.T) {
-	r := newReader([]byte{
+	r := NewReader([]byte{
 		0x78, 0x56, 0x34, 0x12,
 		0xff, 0xff, 0xff, 0xff,
 		0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01,
@@ -41,7 +41,7 @@ func TestReaderPrimitives(t *testing.T) {
 }
 
 func TestReaderString(t *testing.T) {
-	r := newReader([]byte{0x05, 'h', 'e', 'l', 'l', 'o', 0x02, 'o', 'k'})
+	r := NewReader([]byte{0x05, 'h', 'e', 'l', 'l', 'o', 0x02, 'o', 'k'})
 
 	if got := r.str(); got != "hello" {
 		t.Fatalf("first str = %q, want hello", got)
@@ -55,7 +55,7 @@ func TestReaderString(t *testing.T) {
 }
 
 func TestReaderStringLong7BitLength(t *testing.T) {
-	r := newReader(append([]byte{0x82, 0x01}, bytesOf('x', 130)...))
+	r := NewReader(append([]byte{0x82, 0x01}, bytesOf('x', 130)...))
 
 	got := r.str()
 	if len(got) != 130 {
@@ -67,7 +67,7 @@ func TestReaderStringLong7BitLength(t *testing.T) {
 }
 
 func TestReaderUnexpectedEOF(t *testing.T) {
-	r := newReader([]byte{0x01, 0x02, 0x03})
+	r := NewReader([]byte{0x01, 0x02, 0x03})
 
 	err := mustPanic(t, func() { r.u32() })
 	if got := r.remaining(); got != 3 {
@@ -79,7 +79,7 @@ func TestReaderUnexpectedEOF(t *testing.T) {
 }
 
 func TestReaderInvalid7BitEncodedInt(t *testing.T) {
-	r := newReader([]byte{0x80, 0x80, 0x80, 0x80, 0x80})
+	r := NewReader([]byte{0x80, 0x80, 0x80, 0x80, 0x80})
 
 	err := mustPanic(t, func() { r.str() })
 	if err == nil || err.Error() != "fch: invalid 7-bit encoded integer" {
@@ -88,7 +88,7 @@ func TestReaderInvalid7BitEncodedInt(t *testing.T) {
 }
 
 func TestReaderNeedRejectsNegativeLength(t *testing.T) {
-	r := newReader([]byte{0x01})
+	r := NewReader([]byte{0x01})
 
 	if r.need(-1) {
 		t.Fatal("need(-1) = true, want false")
@@ -96,7 +96,7 @@ func TestReaderNeedRejectsNegativeLength(t *testing.T) {
 }
 
 func TestReaderFloatPreservesBits(t *testing.T) {
-	r := newReader([]byte{0x00, 0x00, 0xc0, 0x7f})
+	r := NewReader([]byte{0x00, 0x00, 0xc0, 0x7f})
 
 	if got := r.f32(); !math.IsNaN(float64(got)) {
 		t.Fatalf("f32 = %v, want NaN", got)
