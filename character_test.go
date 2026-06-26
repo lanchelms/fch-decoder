@@ -251,14 +251,8 @@ func TestCharacterValidateRejectsUnexpectedShape(t *testing.T) {
 }
 
 func validCharacter() *Character {
-	return &Character{
-		Version: supportedCharacterVersion,
-		Player: PlayerData{
-			HasPlayerData:    true,
-			PlayerVersion:    supportedPlayerVersion,
-			InventoryVersion: supportedInventoryVersion,
-			SkillVersion:     supportedSkillVersion,
-		},
-		Trailer: Trailer{HashValid: true},
-	}
+	character := NewCharacter("Valid Test", 123456)
+	character.Player = NewPlayer(character.Player.Name, character.Player.PlayerID)
+	character.Trailer.HashValid = true
+	return character
 }
