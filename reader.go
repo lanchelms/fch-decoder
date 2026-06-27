@@ -87,3 +87,7 @@ func (r *Reader) read7BitEncodedInt() int {
 	}
 	panic(fmt.Errorf("fch: invalid 7-bit encoded integer"))
 }
+
+func (r *Reader) hash(to int) []byte {
+	return hash(r.data[fileLengthSize : fileLengthSize+to])
+}

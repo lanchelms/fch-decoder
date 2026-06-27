@@ -83,7 +83,7 @@ func (c *Character) Decode(r *Reader) {
 		panic(fmt.Errorf("fch: unexpected trailer hash length %d", c.Trailer.Length))
 	}
 	c.Trailer.Hash = append([]byte(nil), r.bytes(payloadHashSize)...)
-	c.Trailer.HashValid = bytes.Equal(currentPayloadHash(r.data, c.FileLength), c.Trailer.Hash)
+	c.Trailer.HashValid = bytes.Equal(r.hash(int(c.FileLength)), c.Trailer.Hash)
 }
 
 func (c Character) Encode(w *Writer) {
@@ -97,7 +97,7 @@ func (c Character) Encode(w *Writer) {
 	w.u32(uint32(len(payloadBytes)))
 	w.bytes(payloadBytes)
 	w.u32(payloadHashSize)
-	w.bytes(payloadHash(payloadBytes))
+	w.bytes(hash(payloadBytes))
 }
 
 func (c Character) encodePayload(w *Writer) {
