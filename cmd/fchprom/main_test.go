@@ -5,10 +5,14 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/lanchelms/fch-decoder/valheim"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
 
 func TestParseCLIAcceptsLegacyComposeFlags(t *testing.T) {
@@ -85,6 +89,89 @@ func TestAllowedPlayerStatsAreChoosy(t *testing.T) {
 	}
 }
 
+func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
+	character := valheim.NewCharacter("Fenris", 123)
+	character.Player.Skills = []valheim.Skill{
+		{Name: "Run", DisplayLevel: 34},
+	}
+	character.Player.RecipeStats = []valheim.StatEntry{
+		{Name: "$item_arrow_fire", Value: 12},
+	}
+	character.Player.EnemyStats = []valheim.StatEntry{
+		{Name: "$enemy_greyling", Value: 7},
+	}
+	character.PlayerStats = []valheim.StatEntry{
+		{Name: "Deaths", Value: 3},
+		{Name: "DistanceTraveled", Value: 456},
+		{Name: "DistanceWalk", Value: 100},
+		{Name: "DistanceRun", Value: 200},
+		{Name: "DistanceAir", Value: 50},
+		{Name: "DistanceSail", Value: 999},
+	}
+
+	c := &collector{
+		cacheTTL: time.Hour,
+		cachedAt: time.Now(),
+		cached: snapshot{
+			errors:     2,
+			characters: []metrics{newMetrics(character)},
+		},
+	}
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(c)
+
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string][]string{
+		"valheim_character_skills":        {"player", "skill"},
+		"valheim_character_crafting":      {"player", "recipe"},
+		"valheim_character_enemies":       {"player", "enemy"},
+		"valheim_character_stats":         {"player", "stat"},
+		"valheim_character_distance":      {"player", "mode"},
+		"valheim_character_scrape_errors": nil,
+	}
+	wantCount := map[string]int{
+		"valheim_character_skills":        1,
+		"valheim_character_crafting":      1,
+		"valheim_character_enemies":       1,
+		"valheim_character_stats":         1,
+		"valheim_character_distance":      5,
+		"valheim_character_scrape_errors": 1,
+	}
+	got := metricFamilies(families)
+	if len(got) != len(want) {
+		t.Fatalf("metric families = %v, want %v", sortedKeys(got), sortedKeys(want))
+	}
+
+	for name, labels := range want {
+		family, ok := got[name]
+		if !ok {
+			t.Fatalf("metric family %q missing from %v", name, sortedKeys(got))
+		}
+		if family.GetType() != dto.MetricType_GAUGE {
+			t.Fatalf("%s type = %s, want GAUGE", name, family.GetType())
+		}
+		if len(family.Metric) != wantCount[name] {
+			t.Fatalf("%s metrics = %d, want %d", name, len(family.Metric), wantCount[name])
+		}
+		if gotLabels := labelNames(family.Metric[0]); !sameStringSet(gotLabels, labels) {
+			t.Fatalf("%s labels = %v, want %v", name, gotLabels, labels)
+		}
+	}
+
+	assertMetricValue(t, got["valheim_character_skills"], 34, map[string]string{"player": "Fenris", "skill": "Run"})
+	assertMetricValue(t, got["valheim_character_crafting"], 12, map[string]string{"player": "Fenris", "recipe": "ArrowFire"})
+	assertMetricValue(t, got["valheim_character_enemies"], 7, map[string]string{"player": "Fenris", "enemy": "Greyling"})
+	assertMetricValue(t, got["valheim_character_stats"], 3, map[string]string{"player": "Fenris", "stat": "Deaths"})
+	assertMetricValue(t, got["valheim_character_distance"], 456, map[string]string{"player": "Fenris", "mode": "Total"})
+	assertMetricValue(t, got["valheim_character_distance"], 106, map[string]string{"player": "Fenris", "mode": "Sail"})
+	assertMetricValue(t, got["valheim_character_scrape_errors"], 2, nil)
+}
+
 func TestDistanceMetricsInferSailingDistance(t *testing.T) {
 	character, err := loadMetrics(filepath.Join("..", "..", "testdata", "Steam_333333_tugen.fch"))
 	if err != nil {
@@ -113,6 +200,71 @@ func TestDistanceMetricsInferSailingDistance(t *testing.T) {
 			t.Fatalf("distance %s = %v, want %v", mode, distances[mode], wantValue)
 		}
 	}
+}
+
+func metricFamilies(families []*dto.MetricFamily) map[string]*dto.MetricFamily {
+	got := make(map[string]*dto.MetricFamily, len(families))
+	for _, family := range families {
+		got[family.GetName()] = family
+	}
+	return got
+}
+
+func labelNames(metric *dto.Metric) []string {
+	names := make([]string, 0, len(metric.Label))
+	for _, label := range metric.Label {
+		names = append(names, label.GetName())
+	}
+	return names
+}
+
+func assertMetricValue(t *testing.T, family *dto.MetricFamily, wantValue float64, labels map[string]string) {
+	t.Helper()
+	for _, metric := range family.Metric {
+		if !metricLabelsMatch(metric, labels) {
+			continue
+		}
+		if got := metric.GetGauge().GetValue(); got != wantValue {
+			t.Fatalf("%s%v = %v, want %v", family.GetName(), labels, got, wantValue)
+		}
+		return
+	}
+	t.Fatalf("%s missing labels %v", family.GetName(), labels)
+}
+
+func metricLabelsMatch(metric *dto.Metric, labels map[string]string) bool {
+	if len(metric.Label) != len(labels) {
+		return false
+	}
+	for _, label := range metric.Label {
+		if labels[label.GetName()] != label.GetValue() {
+			return false
+		}
+	}
+	return true
+}
+
+func sortedKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sameStringSet(a []string, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	sort.Strings(a)
+	sort.Strings(b)
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestLoadSnapshotFromFixtures(t *testing.T) {
