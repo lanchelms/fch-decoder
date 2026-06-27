@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	fch "github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder/valheim"
+	"github.com/lanchelms/fch-decoder/valheim/items"
 )
 
 const maxSkillLevel = 100
@@ -23,13 +24,13 @@ type playerStatRef struct {
 
 type inventoryItemParser struct {
 	parts         []string
-	metadata      fch.ItemMetadata
-	item          fch.Item
+	metadata      items.Metadata
+	item          valheim.Item
 	positioned    bool
 	durabilitySet bool
 }
 
-func parseInventoryItem(value string) (fch.Item, bool, error) {
+func parseInventoryItem(value string) (valheim.Item, bool, error) {
 	parser := inventoryItemParser{parts: strings.Split(value, ",")}
 	return parser.parse()
 }
@@ -42,12 +43,12 @@ func parseInventoryName(value string) (string, error) {
 	return name, nil
 }
 
-func (p *inventoryItemParser) parse() (fch.Item, bool, error) {
+func (p *inventoryItemParser) parse() (valheim.Item, bool, error) {
 	if err := p.parseName(); err != nil {
-		return fch.Item{}, false, err
+		return valheim.Item{}, false, err
 	}
 	if err := p.parseFields(); err != nil {
-		return fch.Item{}, false, err
+		return valheim.Item{}, false, err
 	}
 	return p.item, p.positioned, nil
 }
@@ -57,12 +58,12 @@ func (p *inventoryItemParser) parseName() error {
 	if name == "" {
 		return fmt.Errorf("inventory item name is required")
 	}
-	metadata, ok := fch.Items().Lookup(name)
+	metadata, ok := items.Catalog().Lookup(name)
 	if !ok {
 		return fmt.Errorf("unknown inventory item %q", name)
 	}
 	p.metadata = metadata
-	p.item = fch.Item{
+	p.item = valheim.Item{
 		Name:       metadata.Name,
 		Stack:      1,
 		Durability: metadata.Durability(1),
@@ -206,7 +207,7 @@ func parseSkillRef(value string) (skillRef, error) {
 		}
 		return skillRef{skillType: int32(n), name: value}, nil
 	}
-	skillType, ok := fch.SkillTypeByName(value)
+	skillType, ok := valheim.SkillTypeByName(value)
 	if !ok {
 		return skillRef{}, fmt.Errorf("unknown skill %q", value)
 	}
@@ -219,12 +220,12 @@ func parsePlayerStatRef(value string) (playerStatRef, error) {
 		if n < 0 {
 			return playerStatRef{}, fmt.Errorf("invalid player stat index %d", n)
 		}
-		if n >= int64(len(fch.PlayerStatNames())) {
+		if n >= int64(len(valheim.PlayerStatNames())) {
 			return playerStatRef{}, fmt.Errorf("unknown player stat index %d", n)
 		}
 		return playerStatRef{index: int(n), name: value}, nil
 	}
-	index, ok := fch.PlayerStatIndexByName(value)
+	index, ok := valheim.PlayerStatIndexByName(value)
 	if !ok {
 		return playerStatRef{}, fmt.Errorf("unknown player stat %q", value)
 	}

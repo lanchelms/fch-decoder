@@ -12,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	fch "github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder/valheim"
 )
 
 func TestRunAppliesEditCommands(t *testing.T) {
@@ -154,20 +155,20 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 	tests := []struct {
 		name   string
 		args   []string
-		expect func(*fch.Character)
+		expect func(*valheim.Character)
 	}{
 		{
 			name: "add inventory",
 			args: []string{"add", "inventory", "Needle,stack=3,pos=4:1"},
-			expect: func(character *fch.Character) {
-				character.Player.Inventory = append(character.Player.Inventory, fch.Item{
+			expect: func(character *valheim.Character) {
+				character.Player.Inventory = append(character.Player.Inventory, valheim.Item{
 					Name:       "Needle",
 					Stack:      3,
 					Durability: 100,
 					GridX:      4,
 					GridY:      1,
 					Quality:    1,
-					CustomData: []fch.TextEntry{},
+					CustomData: []valheim.TextEntry{},
 					PickedUp:   true,
 				})
 			},
@@ -175,7 +176,7 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 		{
 			name: "remove inventory",
 			args: []string{"remove", "inventory", "Hammer"},
-			expect: func(character *fch.Character) {
+			expect: func(character *valheim.Character) {
 				if err := character.RemoveInventoryItem("Hammer"); err != nil {
 					panic(err)
 				}
@@ -184,28 +185,28 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 		{
 			name: "set skill",
 			args: []string{"set", "skill", "Run", "22"},
-			expect: func(character *fch.Character) {
+			expect: func(character *valheim.Character) {
 				character.SetSkill(102, 22)
 			},
 		},
 		{
 			name: "set enemy",
 			args: []string{"set", "enemy", "$enemy_greydwarf", "123"},
-			expect: func(character *fch.Character) {
+			expect: func(character *valheim.Character) {
 				character.UpsertEnemyStat("$enemy_greydwarf", 123)
 			},
 		},
 		{
 			name: "set material",
 			args: []string{"set", "material", "$item_wood", "777"},
-			expect: func(character *fch.Character) {
+			expect: func(character *valheim.Character) {
 				character.UpsertMaterialStat("$item_wood", 777)
 			},
 		},
 		{
 			name: "set player stat",
 			args: []string{"set", "player-stat", "Deaths", "5"},
-			expect: func(character *fch.Character) {
+			expect: func(character *valheim.Character) {
 				if err := character.SetPlayerStat(0, "Deaths", 5); err != nil {
 					panic(err)
 				}
@@ -582,10 +583,10 @@ func TestRunListsInventory(t *testing.T) {
 
 func TestListInventoryAlignsColumns(t *testing.T) {
 	runner := &editRunner{stdout: &bytes.Buffer{}}
-	character := &fch.Character{
-		Player: fch.Player{
-			PlayerState: fch.PlayerState{
-				Inventory: []fch.Item{
+	character := &valheim.Character{
+		Player: valheim.Player{
+			PlayerState: valheim.PlayerState{
+				Inventory: []valheim.Item{
 					{Name: "Wood", Stack: 1, Quality: 1, Durability: 1},
 					{Name: "ReallyLongInventoryItemName", Stack: 2, Quality: 3, Durability: 4},
 				},
@@ -650,33 +651,33 @@ func TestRunRejectsInvalidTrailerHash(t *testing.T) {
 func TestRunRejectsUnsupportedVersions(t *testing.T) {
 	tests := []struct {
 		name string
-		edit func(*fch.Character)
+		edit func(*valheim.Character)
 		want string
 	}{
 		{
 			name: "character version",
-			edit: func(character *fch.Character) {
+			edit: func(character *valheim.Character) {
 				character.Version++
 			},
 			want: "unsupported character version 44",
 		},
 		{
 			name: "player version",
-			edit: func(character *fch.Character) {
+			edit: func(character *valheim.Character) {
 				character.Player.PlayerVersion++
 			},
 			want: "unsupported player version 30",
 		},
 		{
 			name: "inventory version",
-			edit: func(character *fch.Character) {
+			edit: func(character *valheim.Character) {
 				character.Player.InventoryVersion++
 			},
 			want: "unsupported inventory version 107",
 		},
 		{
 			name: "skill version",
-			edit: func(character *fch.Character) {
+			edit: func(character *valheim.Character) {
 				character.Player.SkillVersion++
 			},
 			want: "unsupported skill version 3",
@@ -725,7 +726,7 @@ func copyFixture(t *testing.T, name string) string {
 	return path
 }
 
-func decodeFile(t *testing.T, path string) *fch.Character {
+func decodeFile(t *testing.T, path string) *valheim.Character {
 	t.Helper()
 	file, err := os.Open(path)
 	if err != nil {
@@ -769,13 +770,7 @@ func insertPayloadBytes(data []byte, offset int, inserted []byte) []byte {
 	return out
 }
 
-func encodeUnchecked(character *fch.Character) []byte {
-	w := fch.NewWriter()
-	character.Encode(w)
-	return w.Data()
-}
-
-func findItem(items []fch.Item, name string) *fch.Item {
+func findItem(items []valheim.Item, name string) *valheim.Item {
 	for i := range items {
 		if items[i].Name == name {
 			return &items[i]
@@ -784,7 +779,7 @@ func findItem(items []fch.Item, name string) *fch.Item {
 	return nil
 }
 
-func findSlot(items []fch.Item, gridX int32, gridY int32) *fch.Item {
+func findSlot(items []valheim.Item, gridX int32, gridY int32) *valheim.Item {
 	for i := range items {
 		if items[i].GridX == gridX && items[i].GridY == gridY {
 			return &items[i]
@@ -793,7 +788,7 @@ func findSlot(items []fch.Item, gridX int32, gridY int32) *fch.Item {
 	return nil
 }
 
-func nextEmptyInventorySlot(items []fch.Item) (int32, int32, bool) {
+func nextEmptyInventorySlot(items []valheim.Item) (int32, int32, bool) {
 	for y := int32(0); y < 4; y++ {
 		for x := int32(0); x < 8; x++ {
 			if findSlot(items, x, y) == nil {
@@ -804,7 +799,7 @@ func nextEmptyInventorySlot(items []fch.Item) (int32, int32, bool) {
 	return 0, 0, false
 }
 
-func skillLevel(skills []fch.Skill, skillType int32) float32 {
+func skillLevel(skills []valheim.Skill, skillType int32) float32 {
 	for _, skill := range skills {
 		if skill.Type == skillType {
 			return skill.Level
@@ -813,7 +808,7 @@ func skillLevel(skills []fch.Skill, skillType int32) float32 {
 	return 0
 }
 
-func statValue(entries []fch.StatEntry, name string) float32 {
+func statValue(entries []valheim.StatEntry, name string) float32 {
 	for _, entry := range entries {
 		if entry.Name == name {
 			return entry.Value
@@ -822,14 +817,14 @@ func statValue(entries []fch.StatEntry, name string) float32 {
 	return 0
 }
 
-func requireFcheditLastModified(t *testing.T, character *fch.Character) string {
+func requireFcheditLastModified(t *testing.T, character *valheim.Character) string {
 	t.Helper()
 	value := requireCustomDataValue(t, character, fcheditLastModifiedKey)
 	requireTimestamp(t, fcheditLastModifiedKey, value, fcheditLastModifiedValue)
 	return value
 }
 
-func requireCustomDataValue(t *testing.T, character *fch.Character, key string) string {
+func requireCustomDataValue(t *testing.T, character *valheim.Character, key string) string {
 	t.Helper()
 	value, ok := customDataValue(character.Player.CustomData, key)
 	if !ok {
@@ -845,7 +840,7 @@ func requireTimestamp(t *testing.T, name string, value string, layout string) {
 	}
 }
 
-func customDataValue(entries []fch.TextEntry, key string) (string, bool) {
+func customDataValue(entries []valheim.TextEntry, key string) (string, bool) {
 	for _, entry := range entries {
 		if entry.Key == key {
 			return entry.Value, true
@@ -854,7 +849,7 @@ func customDataValue(entries []fch.TextEntry, key string) (string, bool) {
 	return "", false
 }
 
-func countCustomData(entries []fch.TextEntry, key string) int {
+func countCustomData(entries []valheim.TextEntry, key string) int {
 	count := 0
 	for _, entry := range entries {
 		if entry.Key == key {

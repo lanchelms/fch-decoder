@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/lanchelms/fch-decoder/valheim"
 )
 
 func TestDecodeSamples(t *testing.T) {
@@ -329,7 +331,7 @@ func minimalMapSection() []byte {
 	return []byte{1, 0, 0, 0, 0}
 }
 
-func assertMinimalCharacter(t *testing.T, got *Character, name string, playerID uint64, dateCreatedUnix int64) {
+func assertMinimalCharacter(t *testing.T, got *valheim.Character, name string, playerID uint64, dateCreatedUnix int64) {
 	t.Helper()
 
 	if got.Version != 43 {
@@ -380,7 +382,7 @@ func assertMinimalCharacter(t *testing.T, got *Character, name string, playerID 
 	if got.Player.Health != 0 || got.Player.MaxHealth != 0 || got.Player.MaxStamina != 0 || got.Player.TimeSinceDeath != 0 {
 		t.Fatalf("player vitals are not zero: %+v", got.Player)
 	}
-	if got.Player.GuardianPower != (GuardianPower{}) {
+	if got.Player.GuardianPower != (valheim.GuardianPower{}) {
 		t.Fatalf("GuardianPower = %+v, want zero", got.Player.GuardianPower)
 	}
 	if got.Trailer.Length != 64 || len(got.Trailer.Hash) != 64 {
@@ -394,7 +396,7 @@ func assertMinimalCharacter(t *testing.T, got *Character, name string, playerID 
 	}
 }
 
-func emptyMinimalLists(p Player) bool {
+func emptyMinimalLists(p valheim.Player) bool {
 	return len(p.KnownWorlds) == 0 &&
 		len(p.KnownWorldKeys) == 0 &&
 		len(p.KnownCommands) == 0 &&

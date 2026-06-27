@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
-	fch "github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder"
 )
 
 type cli struct {

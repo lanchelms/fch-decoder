@@ -8,7 +8,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY *.go ./
-COPY data ./data
+COPY binary ./binary
+COPY valheim ./valheim
 COPY cmd/fchprom/main.go ./cmd/fchprom/main.go
 
 ARG TARGETOS

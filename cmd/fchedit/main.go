@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	fch "github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder/valheim"
+	"github.com/lanchelms/fch-decoder/valheim/items"
 )
 
 const (
@@ -44,13 +46,23 @@ func (cmd *addInventoryCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
-		item = c.CreditCraftedItem(item)
+	return r.apply(func(c *valheim.Character) error {
+		item = creditCraftedItem(c, item)
 		if positioned {
 			return c.PutInventoryItem(item, true)
 		}
 		return c.PlaceInventoryItem(item)
 	}, fmt.Sprintf("add inventory %s", item.Name))
+}
+
+func creditCraftedItem(character *valheim.Character, item valheim.Item) valheim.Item {
+	metadata, ok := items.Catalog().Lookup(item.Name)
+	if !ok || len(metadata.Recipes) == 0 || item.CrafterID != 0 || item.CrafterName != "" {
+		return item
+	}
+	item.CrafterID = character.Player.PlayerID
+	item.CrafterName = character.Player.Name
+	return item
 }
 
 type removeCmd struct {
@@ -66,7 +78,7 @@ func (cmd *removeInventoryCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
+	return r.apply(func(c *valheim.Character) error {
 		return c.RemoveInventoryItem(name)
 	}, fmt.Sprintf("remove inventory %s", name))
 }
@@ -92,7 +104,7 @@ func (cmd *setSkillCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
+	return r.apply(func(c *valheim.Character) error {
 		c.SetSkill(skill.skillType, level)
 		return nil
 	}, fmt.Sprintf("set skill %s=%v", skill.name, level))
@@ -112,7 +124,7 @@ func (cmd *setEnemyCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
+	return r.apply(func(c *valheim.Character) error {
 		c.UpsertEnemyStat(name, value)
 		return nil
 	}, fmt.Sprintf("set enemy %s=%v", name, value))
@@ -132,7 +144,7 @@ func (cmd *setMaterialCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
+	return r.apply(func(c *valheim.Character) error {
 		c.UpsertMaterialStat(name, value)
 		return nil
 	}, fmt.Sprintf("set material %s=%v", name, value))
@@ -152,7 +164,7 @@ func (cmd *setPlayerStatCmd) Run(r *editRunner) error {
 	if err != nil {
 		return err
 	}
-	return r.apply(func(c *fch.Character) error {
+	return r.apply(func(c *valheim.Character) error {
 		return c.SetPlayerStat(stat.index, stat.name, value)
 	}, fmt.Sprintf("set player-stat %s=%v", stat.name, value))
 }
@@ -167,7 +179,7 @@ type listCmd struct {
 type listSkillsCmd struct{}
 
 func (cmd *listSkillsCmd) Run(r *editRunner) error {
-	for _, name := range fch.SkillNames() {
+	for _, name := range valheim.SkillNames() {
 		fmt.Fprintln(r.stdout, name)
 	}
 	return nil
@@ -177,7 +189,7 @@ type listPlayerStatCmd struct{}
 
 func (cmd *listPlayerStatCmd) Run(r *editRunner) error {
 	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
-	for i, name := range fch.PlayerStatNames() {
+	for i, name := range valheim.PlayerStatNames() {
 		fmt.Fprintf(w, "%d\t%s\n", i, name)
 	}
 	return w.Flush()
@@ -189,7 +201,7 @@ type listItemsCmd struct {
 
 func (cmd *listItemsCmd) Run(r *editRunner) error {
 	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
-	for _, item := range fch.Items().List() {
+	for _, item := range items.Catalog().List() {
 		if !cmd.All && !item.InventoryValid {
 			continue
 		}
@@ -222,7 +234,7 @@ type editRunner struct {
 	now      func() time.Time
 }
 
-func (r *editRunner) listInventory(character *fch.Character) error {
+func (r *editRunner) listInventory(character *valheim.Character) error {
 	w := tabwriter.NewWriter(r.stdout, 0, 0, 2, ' ', 0)
 	for _, item := range character.Player.Inventory {
 		fmt.Fprintf(w, "%s\tstack=%d\tquality=%d\tdurability=%v\tgrid=%d,%d\n",
@@ -237,7 +249,7 @@ func (r *editRunner) listInventory(character *fch.Character) error {
 	return w.Flush()
 }
 
-func (r *editRunner) readCharacter() (*fch.Character, error) {
+func (r *editRunner) readCharacter() (*valheim.Character, error) {
 	if r.path == "" {
 		return nil, fmt.Errorf("missing character: set --character or CHARACTER")
 	}
@@ -252,7 +264,7 @@ func (r *editRunner) readCharacter() (*fch.Character, error) {
 	return character, nil
 }
 
-func (r *editRunner) apply(edit func(*fch.Character) error, summary string) error {
+func (r *editRunner) apply(edit func(*valheim.Character) error, summary string) error {
 	character, err := r.readCharacter()
 	if err != nil {
 		return err

@@ -1,12 +1,15 @@
 package fch
 
-import "io"
+import (
+	"fmt"
+	"io"
+	"math"
 
-type encoder interface {
-	Encode(*Writer)
-}
+	"github.com/lanchelms/fch-decoder/binary"
+	"github.com/lanchelms/fch-decoder/valheim"
+)
 
-func Encode(w io.Writer, c *Character) error {
+func Encode(w io.Writer, c *valheim.Character) error {
 	data, err := EncodeBytes(c)
 	if err != nil {
 		return err
@@ -18,11 +21,21 @@ func Encode(w io.Writer, c *Character) error {
 	return err
 }
 
-func EncodeBytes(c *Character) ([]byte, error) {
+func EncodeBytes(c *valheim.Character) ([]byte, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	w := NewWriter()
-	c.Encode(w)
+	payload := binary.NewWriter()
+	c.Encode(payload)
+	payloadBytes := payload.Data()
+	if len(payloadBytes) > math.MaxUint32 {
+		return nil, fmt.Errorf("fch: payload too large: %d bytes", len(payloadBytes))
+	}
+
+	w := binary.NewWriter()
+	w.Uint32(uint32(len(payloadBytes)))
+	w.Bytes(payloadBytes)
+	w.Uint32(payloadHashSize)
+	w.Bytes(hash(payloadBytes))
 	return w.Data(), nil
 }

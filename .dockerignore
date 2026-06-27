@@ -3,7 +3,10 @@
 !go.mod
 !go.sum
 !*.go
-!data/
+!binary/
+!binary/**
+!valheim/
+!valheim/**
 !cmd/
 !cmd/fchdump/
 !cmd/fchdump/Dockerfile

@@ -15,7 +15,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	fch "github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder"
+	"github.com/lanchelms/fch-decoder/valheim"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/text/cases"
@@ -168,7 +169,7 @@ type metrics struct {
 	samples []sample
 }
 
-func (m *metrics) addStats(desc *prometheus.Desc, entries []fch.StatEntry) {
+func (m *metrics) addStats(desc *prometheus.Desc, entries []valheim.StatEntry) {
 	for _, entry := range entries {
 		name := cleanMetricLabel(entry.Name, desc)
 		if name == "" {
@@ -332,7 +333,7 @@ func loadMetrics(path string) (metrics, error) {
 	return newMetrics(character), nil
 }
 
-func newMetrics(character *fch.Character) metrics {
+func newMetrics(character *valheim.Character) metrics {
 	out := metrics{player: character.Player.Name}
 	for _, skill := range character.Player.Skills {
 		if skill.Name == "" {
@@ -352,7 +353,7 @@ func newMetrics(character *fch.Character) metrics {
 	return out
 }
 
-func (m *metrics) addDistanceStats(entries []fch.StatEntry) {
+func (m *metrics) addDistanceStats(entries []valheim.StatEntry) {
 	stats := map[string]float64{}
 	for _, entry := range entries {
 		stats[entry.Name] = float64(entry.Value)

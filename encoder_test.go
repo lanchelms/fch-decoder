@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/lanchelms/fch-decoder/binary"
+	"github.com/lanchelms/fch-decoder/valheim"
 )
 
 func TestEncodeFixtureRoundTripsByteForByte(t *testing.T) {
@@ -77,7 +80,7 @@ func TestEncodeSyntheticCharacterDecodes(t *testing.T) {
 	if decoded.Player.KnownWorldKeys[0].Raw != "defeated_eikthyr True" {
 		t.Fatalf("KnownWorldKeys[0].Raw = %q", decoded.Player.KnownWorldKeys[0].Raw)
 	}
-	if decoded.Player.Inventory[0].CustomData[0] != (TextEntry{Key: "crafter", Value: "yes"}) {
+	if decoded.Player.Inventory[0].CustomData[0] != (valheim.TextEntry{Key: "crafter", Value: "yes"}) {
 		t.Fatalf("Inventory[0].CustomData = %+v", decoded.Player.Inventory[0].CustomData)
 	}
 	if decoded.Player.Skills[0].DisplayLevel != 12 {
@@ -95,7 +98,7 @@ func TestEncodeSyntheticCharacterDecodes(t *testing.T) {
 }
 
 func TestEncodeNewCharacterWithPlayerData(t *testing.T) {
-	character := NewCharacter("New Test", 987654321)
+	character := valheim.NewCharacter("New Test", 987654321)
 	encoded, err := EncodeBytes(character)
 	if err != nil {
 		t.Fatal(err)
@@ -116,14 +119,14 @@ func TestEncodeNewCharacterWithPlayerData(t *testing.T) {
 	if !decoded.HasPlayerData {
 		t.Fatal("HasPlayerData = false, want true")
 	}
-	if decoded.Player.PlayerVersion != supportedPlayerVersion {
-		t.Fatalf("PlayerVersion = %d, want %d", decoded.Player.PlayerVersion, supportedPlayerVersion)
+	if decoded.Player.PlayerVersion != 29 {
+		t.Fatalf("PlayerVersion = %d, want 29", decoded.Player.PlayerVersion)
 	}
-	if decoded.Player.InventoryVersion != supportedInventoryVersion {
-		t.Fatalf("InventoryVersion = %d, want %d", decoded.Player.InventoryVersion, supportedInventoryVersion)
+	if decoded.Player.InventoryVersion != 106 {
+		t.Fatalf("InventoryVersion = %d, want 106", decoded.Player.InventoryVersion)
 	}
-	if decoded.Player.SkillVersion != supportedSkillVersion {
-		t.Fatalf("SkillVersion = %d, want %d", decoded.Player.SkillVersion, supportedSkillVersion)
+	if decoded.Player.SkillVersion != 2 {
+		t.Fatalf("SkillVersion = %d, want 2", decoded.Player.SkillVersion)
 	}
 	if decoded.PlayerDataLength == 0 {
 		t.Fatal("PlayerDataLength = 0, want encoded player data")
@@ -200,7 +203,7 @@ func TestEncodeRecalculatesPlayerDataLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	character.Player.Inventory = append(character.Player.Inventory, Item{
+	character.Player.Inventory = append(character.Player.Inventory, valheim.Item{
 		Name:        "Wood",
 		Stack:       50,
 		Durability:  1,
@@ -256,63 +259,53 @@ func TestEncodeRejectsPlayerStatCountMismatch(t *testing.T) {
 	}
 }
 
-func TestEncodeRejectsUnsupportedTailFloatCount(t *testing.T) {
-	character := syntheticCharacter()
-	character.Player.tailFloatCount = 1
-
-	_, err := EncodeBytes(character)
-	if err == nil || err.Error() != "fch: unsupported player tail float count 1" {
-		t.Fatalf("EncodeBytes error = %v, want unsupported tail float count", err)
-	}
-}
-
-func syntheticCharacter() *Character {
-	return &Character{
+func syntheticCharacter() *valheim.Character {
+	return &valheim.Character{
 		Version:         43,
 		PlayerStatCount: 2,
-		PlayerStats: []StatEntry{
+		PlayerStats: []valheim.StatEntry{
 			{Name: "Deaths", Value: 1},
 			{Name: "CraftingStationUses", Value: 2.5},
 		},
-		Map:              Map{Raw: syntheticMapSection()},
+		Map:              valheim.Map{Raw: syntheticMapSection()},
 		HasPlayerData:    true,
 		PlayerDataLength: 999,
-		Player: Player{
+		Player: valheim.Player{
 			Name:            "Encoder Test",
 			PlayerID:        123456,
 			StartSeed:       "seed",
 			UsedCheats:      true,
 			DateCreatedUnix: 1780027200,
-			KnownWorlds: []TimeEntry{
+			KnownWorlds: []valheim.TimeEntry{
 				{Name: "world", Seconds: 12.5},
 			},
-			KnownWorldKeys: []WorldKey{
+			KnownWorldKeys: []valheim.WorldKey{
 				{Key: "defeated_eikthyr", Setting: "True", Seconds: 9},
 			},
-			KnownCommands: []StatEntry{
+			KnownCommands: []valheim.StatEntry{
 				{Name: "god", Value: 1},
 			},
-			EnemyStats: []StatEntry{
+			EnemyStats: []valheim.StatEntry{
 				{Name: "Greydwarf", Value: 3},
 			},
-			MaterialStats: []StatEntry{
+			MaterialStats: []valheim.StatEntry{
 				{Name: "Wood", Value: 4},
 			},
-			RecipeStats: []StatEntry{
+			RecipeStats: []valheim.StatEntry{
 				{Name: "Hammer", Value: 5},
 			},
-			PlayerState: PlayerState{
+			PlayerState: valheim.PlayerState{
 				PlayerVersion:  29,
 				MaxHealth:      100,
 				Health:         75,
 				MaxStamina:     120,
 				TimeSinceDeath: 6,
-				GuardianPower: GuardianPower{
+				GuardianPower: valheim.GuardianPower{
 					Name:     "GP_Eikthyr",
 					Cooldown: 7,
 				},
 				InventoryVersion: 106,
-				Inventory: []Item{
+				Inventory: []valheim.Item{
 					{
 						Name:        "Hammer",
 						Stack:       1,
@@ -324,7 +317,7 @@ func syntheticCharacter() *Character {
 						Variant:     5,
 						CrafterID:   6,
 						CrafterName: "Crafter",
-						CustomData: []TextEntry{
+						CustomData: []valheim.TextEntry{
 							{Key: "crafter", Value: "yes"},
 						},
 						WorldLevel: 7,
@@ -332,32 +325,32 @@ func syntheticCharacter() *Character {
 					},
 				},
 			},
-			PlayerTail: PlayerTail{
+			PlayerTail: valheim.PlayerTail{
 				KnownRecipes: []string{"Hammer"},
-				KnownStations: []Station{
+				KnownStations: []valheim.Station{
 					{Name: "piece_workbench", Level: 2},
 				},
 				KnownMaterials: []string{"Wood"},
 				ShownTutorials: []string{"tutorial"},
 				Uniques:        []string{"unique"},
 				Trophies:       []string{"TrophyDeer"},
-				KnownBiomes:    []Biome{1},
-				PlayerKnownTexts: []TextEntry{
+				KnownBiomes:    []valheim.Biome{1},
+				PlayerKnownTexts: []valheim.TextEntry{
 					{Key: "raven", Value: "text"},
 				},
 				Beard:        "Beard1",
 				Hair:         "Hair1",
-				SkinColor:    Vector3{X: 0.1, Y: 0.2, Z: 0.3},
-				HairColor:    Vector3{X: 0.4, Y: 0.5, Z: 0.6},
+				SkinColor:    valheim.Vector3{X: 0.1, Y: 0.2, Z: 0.3},
+				HairColor:    valheim.Vector3{X: 0.4, Y: 0.5, Z: 0.6},
 				ModelIndex:   1,
 				SkillVersion: 2,
-				Foods: []Food{
+				Foods: []valheim.Food{
 					{Name: "CookedMeat", Time: 10},
 				},
-				Skills: []Skill{
+				Skills: []valheim.Skill{
 					{Type: 1, Level: 12.75, Accumulator: 0.5},
 				},
-				CustomData: []TextEntry{
+				CustomData: []valheim.TextEntry{
 					{Key: "custom", Value: "data"},
 				},
 				Stamina: 84,
@@ -369,10 +362,10 @@ func syntheticCharacter() *Character {
 }
 
 func syntheticMapSection() []byte {
-	w := NewWriter()
-	w.u32(3)
-	w.u32(0)
-	w.u32(3)
+	w := binary.NewWriter()
+	w.Uint32(3)
+	w.Uint32(0)
+	w.Uint32(3)
 	raw := w.Data()
 	return append(raw, 0x1f, 0x8b, 0x08)
 }
