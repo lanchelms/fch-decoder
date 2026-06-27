@@ -320,13 +320,7 @@ func loadSnapshot(dir string, workers int) snapshot {
 }
 
 func loadMetrics(path string) (metrics, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return metrics{}, err
-	}
-	defer f.Close()
-
-	character, err := fch.Decode(f)
+	character, err := fch.DecodeFile(path)
 	if err != nil {
 		return metrics{}, err
 	}

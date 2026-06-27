@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/lanchelms/fch-decoder/binary"
 	"github.com/lanchelms/fch-decoder/valheim"
@@ -17,6 +18,14 @@ const (
 
 func Decode(r io.Reader) (*valheim.Character, error) {
 	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return DecodeBytes(data)
+}
+
+func DecodeFile(path string) (*valheim.Character, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

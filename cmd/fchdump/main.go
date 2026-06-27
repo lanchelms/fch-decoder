@@ -36,13 +36,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return err
 	}
 
-	f, err := os.Open(cli.Character)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	character, err := fch.Decode(f)
+	character, err := fch.DecodeFile(cli.Character)
 	if err != nil {
 		return err
 	}

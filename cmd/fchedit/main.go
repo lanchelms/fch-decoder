@@ -253,11 +253,7 @@ func (r *editRunner) readCharacter() (*valheim.Character, error) {
 	if r.path == "" {
 		return nil, fmt.Errorf("missing character: set --character or CHARACTER")
 	}
-	data, err := os.ReadFile(r.path)
-	if err != nil {
-		return nil, fmt.Errorf("read character %s: %w", r.path, err)
-	}
-	character, err := fch.DecodeBytes(data)
+	character, err := fch.DecodeFile(r.path)
 	if err != nil {
 		return nil, fmt.Errorf("decode character %s: %w", r.path, err)
 	}

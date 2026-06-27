@@ -252,6 +252,19 @@ func TestDecodeSamples(t *testing.T) {
 	}
 }
 
+func TestDecodeFile(t *testing.T) {
+	got, err := DecodeFile(filepath.Join("testdata", "Steam_333333_tugen.fch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Player.Name != "Tugen" {
+		t.Fatalf("Player.Name = %q, want Tugen", got.Player.Name)
+	}
+	if !got.Trailer.HashValid {
+		t.Fatal("Trailer.HashValid = false, want true")
+	}
+}
+
 func TestDecodeDetectsInvalidTrailerHash(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "Steam_333333_tugen.fch"))
 	if err != nil {

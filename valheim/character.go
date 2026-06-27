@@ -152,44 +152,63 @@ func (c *Character) AddInventoryItem(item Item) {
 	c.Player.Inventory = append(c.Player.Inventory, item)
 }
 
+// InventoryItem returns the first inventory item with an exact name match.
+func (c *Character) InventoryItem(name string) (*Item, bool) {
+	for i := range c.Player.Inventory {
+		if c.Player.Inventory[i].Name == name {
+			return &c.Player.Inventory[i], true
+		}
+	}
+	return nil, false
+}
+
+// InventorySlot returns the inventory item at a grid slot.
+func (c *Character) InventorySlot(x, y int32) (*Item, bool) {
+	for i := range c.Player.Inventory {
+		if c.Player.Inventory[i].GridX == x && c.Player.Inventory[i].GridY == y {
+			return &c.Player.Inventory[i], true
+		}
+	}
+	return nil, false
+}
+
+// EmptyInventorySlot returns the first empty normal inventory slot.
+func (c *Character) EmptyInventorySlot() (int32, int32, bool) {
+	for y := int32(0); y < inventoryHeight; y++ {
+		for x := int32(0); x < inventoryWidth; x++ {
+			if _, occupied := c.InventorySlot(x, y); !occupied {
+				return x, y, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
 // PutInventoryItem adds item unless its grid slot is occupied. When replace is
 // true, the item at the same grid slot is overwritten.
 func (c *Character) PutInventoryItem(item Item, replace bool) error {
-	for i, existing := range c.Player.Inventory {
-		if existing.GridX == item.GridX && existing.GridY == item.GridY {
-			if !replace {
-				return fmt.Errorf("inventory slot %d,%d is occupied by %q", item.GridX, item.GridY, existing.Name)
-			}
-			c.Player.Inventory[i] = item
-			return nil
-		}
+	existing, occupied := c.InventorySlot(item.GridX, item.GridY)
+	if !occupied {
+		c.AddInventoryItem(item)
+		return nil
 	}
-	c.AddInventoryItem(item)
+	if !replace {
+		return fmt.Errorf("inventory slot %d,%d is occupied by %q", item.GridX, item.GridY, existing.Name)
+	}
+	*existing = item
 	return nil
 }
 
 // PlaceInventoryItem adds item to the first empty normal inventory slot.
 func (c *Character) PlaceInventoryItem(item Item) error {
-	for y := int32(0); y < inventoryHeight; y++ {
-		for x := int32(0); x < inventoryWidth; x++ {
-			if !c.inventorySlotOccupied(x, y) {
-				item.GridX = x
-				item.GridY = y
-				c.AddInventoryItem(item)
-				return nil
-			}
-		}
+	x, y, ok := c.EmptyInventorySlot()
+	if !ok {
+		return fmt.Errorf("inventory has no empty slots")
 	}
-	return fmt.Errorf("inventory has no empty slots")
-}
-
-func (c *Character) inventorySlotOccupied(x int32, y int32) bool {
-	for _, item := range c.Player.Inventory {
-		if item.GridX == x && item.GridY == y {
-			return true
-		}
-	}
-	return false
+	item.GridX = x
+	item.GridY = y
+	c.AddInventoryItem(item)
+	return nil
 }
 
 // RemoveInventoryItem removes the first inventory item with an exact name match.
@@ -220,14 +239,34 @@ func (c *Character) SetSkill(skillType int32, level float32) {
 	})
 }
 
+// Skill returns the saved skill by type.
+func (c *Character) Skill(skillType int32) (Skill, bool) {
+	for _, skill := range c.Player.Skills {
+		if skill.Type == skillType {
+			return skill, true
+		}
+	}
+	return Skill{}, false
+}
+
 // UpsertEnemyStat updates an enemy stat by case-insensitive name or appends it.
 func (c *Character) UpsertEnemyStat(name string, value float32) {
 	upsertStat(&c.Player.EnemyStats, name, value)
 }
 
+// EnemyStat returns an enemy stat by case-insensitive name.
+func (c *Character) EnemyStat(name string) (float32, bool) {
+	return stat(c.Player.EnemyStats, name)
+}
+
 // UpsertMaterialStat updates a material stat by case-insensitive name or appends it.
 func (c *Character) UpsertMaterialStat(name string, value float32) {
 	upsertStat(&c.Player.MaterialStats, name, value)
+}
+
+// MaterialStat returns a material stat by case-insensitive name.
+func (c *Character) MaterialStat(name string) (float32, bool) {
+	return stat(c.Player.MaterialStats, name)
 }
 
 // SetPlayerStat sets a player stat by index and keeps PlayerStatCount synchronized.
@@ -254,6 +293,16 @@ func (c *Character) UpsertCustomData(key string, value string) {
 	c.Player.CustomData = append(c.Player.CustomData, TextEntry{Key: key, Value: value})
 }
 
+// CustomData returns player custom data by exact key.
+func (c *Character) CustomData(key string) (string, bool) {
+	for _, entry := range c.Player.CustomData {
+		if entry.Key == key {
+			return entry.Value, true
+		}
+	}
+	return "", false
+}
+
 func upsertStat(entries *[]StatEntry, name string, value float32) {
 	for i := range *entries {
 		if strings.EqualFold((*entries)[i].Name, name) {
@@ -262,4 +311,13 @@ func upsertStat(entries *[]StatEntry, name string, value float32) {
 		}
 	}
 	*entries = append(*entries, StatEntry{Name: name, Value: value})
+}
+
+func stat(entries []StatEntry, name string) (float32, bool) {
+	for _, entry := range entries {
+		if strings.EqualFold(entry.Name, name) {
+			return entry.Value, true
+		}
+	}
+	return 0, false
 }

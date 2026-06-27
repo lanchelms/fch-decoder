@@ -104,6 +104,43 @@ func TestCharacterEditMethods(t *testing.T) {
 	}
 }
 
+func TestCharacterQueryMethods(t *testing.T) {
+	character := &Character{}
+	character.Player.Inventory = []Item{
+		{Name: "Wood", GridX: 0, GridY: 0},
+		{Name: "Stone", GridX: 2, GridY: 1},
+	}
+	character.Player.Skills = []Skill{{Type: 102, Name: "Run", Level: 22.75}}
+	character.Player.EnemyStats = []StatEntry{{Name: "$enemy_greydwarf", Value: 3}}
+	character.Player.MaterialStats = []StatEntry{{Name: "$item_wood", Value: 50}}
+	character.Player.CustomData = []TextEntry{{Key: "fchedit.lastModified", Value: "2026-06-26T12:00:00Z"}}
+
+	if item, ok := character.InventoryItem("Wood"); !ok || item.Name != "Wood" {
+		t.Fatalf("InventoryItem Wood = %+v ok=%v", item, ok)
+	}
+	if _, ok := character.InventoryItem("wood"); ok {
+		t.Fatal("InventoryItem wood ok = true, want exact name match")
+	}
+	if item, ok := character.InventorySlot(2, 1); !ok || item.Name != "Stone" {
+		t.Fatalf("InventorySlot 2,1 = %+v ok=%v", item, ok)
+	}
+	if x, y, ok := character.EmptyInventorySlot(); !ok || x != 1 || y != 0 {
+		t.Fatalf("EmptyInventorySlot = %d,%d ok=%v, want 1,0 true", x, y, ok)
+	}
+	if skill, ok := character.Skill(102); !ok || skill.Level != 22.75 {
+		t.Fatalf("Skill 102 = %+v ok=%v, want level 22.75", skill, ok)
+	}
+	if value, ok := character.EnemyStat("$enemy_GREYDWARF"); !ok || value != 3 {
+		t.Fatalf("EnemyStat = %v ok=%v, want 3 true", value, ok)
+	}
+	if value, ok := character.MaterialStat("$ITEM_WOOD"); !ok || value != 50 {
+		t.Fatalf("MaterialStat = %v ok=%v, want 50 true", value, ok)
+	}
+	if value, ok := character.CustomData("fchedit.lastModified"); !ok || value != "2026-06-26T12:00:00Z" {
+		t.Fatalf("CustomData = %q ok=%v", value, ok)
+	}
+}
+
 func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {
 	character := &Character{}
 	for y := int32(0); y < inventoryHeight; y++ {

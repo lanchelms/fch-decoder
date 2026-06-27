@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,37 +42,40 @@ func TestRunAppliesEditCommands(t *testing.T) {
 		t.Fatalf("stdout = %q, want wrote message", stdout.String())
 	}
 
-	got := decodeFile(t, out)
+	got, err := fch.DecodeFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !got.Trailer.HashValid {
 		t.Fatal("Trailer.HashValid = false, want true")
 	}
-	if findItem(got.Player.Inventory, "Wood") != nil {
+	if _, ok := got.InventoryItem("Wood"); ok {
 		t.Fatal("Wood inventory item still present after add then remove")
 	}
-	stone := findItem(got.Player.Inventory, "Stone")
-	if stone == nil {
+	stone, ok := got.InventoryItem("Stone")
+	if !ok {
 		t.Fatal("Stone inventory item was not added")
 	}
 	if stone.Stack != 25 || stone.Durability != 100 || stone.Quality != 1 || stone.GridX != 2 || stone.GridY != 2 || !stone.PickedUp {
 		t.Fatalf("Stone item = %+v, want stack 25 with defaults", *stone)
 	}
-	if got := skillLevel(got.Player.Skills, 1); got != 44.5 {
-		t.Fatalf("Swords level = %v, want 44.5", got)
+	if skill, ok := got.Skill(1); !ok || skill.Level != 44.5 {
+		t.Fatalf("Swords skill = %+v ok=%v, want level 44.5", skill, ok)
 	}
-	if got := skillLevel(got.Player.Skills, 102); got != 22 {
-		t.Fatalf("Run level = %v, want 22", got)
+	if skill, ok := got.Skill(102); !ok || skill.Level != 22 {
+		t.Fatalf("Run skill = %+v ok=%v, want level 22", skill, ok)
 	}
-	if got := statValue(got.Player.EnemyStats, "$enemy_greydwarf"); got != 123 {
-		t.Fatalf("enemy greydwarf stat = %v, want 123", got)
+	if value, ok := got.EnemyStat("$enemy_greydwarf"); !ok || value != 123 {
+		t.Fatalf("enemy greydwarf stat = %v ok=%v, want 123", value, ok)
 	}
-	if got := statValue(got.Player.EnemyStats, "$enemy_troll"); got != 9 {
-		t.Fatalf("enemy troll stat = %v, want 9", got)
+	if value, ok := got.EnemyStat("$enemy_troll"); !ok || value != 9 {
+		t.Fatalf("enemy troll stat = %v ok=%v, want 9", value, ok)
 	}
-	if got := statValue(got.Player.MaterialStats, "$item_wood"); got != 777 {
-		t.Fatalf("material wood stat = %v, want 777", got)
+	if value, ok := got.MaterialStat("$item_wood"); !ok || value != 777 {
+		t.Fatalf("material wood stat = %v ok=%v, want 777", value, ok)
 	}
-	if got := statValue(got.Player.MaterialStats, "$item_stone"); got != 12 {
-		t.Fatalf("material stone stat = %v, want 12", got)
+	if value, ok := got.MaterialStat("$item_stone"); !ok || value != 12 {
+		t.Fatalf("material stone stat = %v ok=%v, want 12", value, ok)
 	}
 	if got := got.PlayerStats[0].Value; got != 5 {
 		t.Fatalf("Deaths player stat = %v, want 5", got)
@@ -95,9 +99,12 @@ func TestRunCreditsRecipeInventoryItem(t *testing.T) {
 		t.Fatalf("run(%v) error = %v, stderr = %s", args, err, stderr.String())
 	}
 
-	got := decodeFile(t, out)
-	item := findItem(got.Player.Inventory, "SwordIron")
-	if item == nil {
+	got, err := fch.DecodeFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, ok := got.InventoryItem("SwordIron")
+	if !ok {
 		t.Fatal("SwordIron inventory item was not added")
 	}
 	if item.CrafterID != got.Player.PlayerID || item.CrafterName != got.Player.Name || !item.PickedUp {
@@ -110,11 +117,14 @@ func TestRunShortFlags(t *testing.T) {
 		in := copyFixture(t, "Steam_333333_tugen.fch")
 		out := filepath.Join(t.TempDir(), "edited.fch")
 
-		if err := run([]string{"-c", in, "-o", out, "set", "player-stat", "Deaths", "4"}, ioDiscard{}, ioDiscard{}); err != nil {
+		if err := run([]string{"-c", in, "-o", out, "set", "player-stat", "Deaths", "4"}, io.Discard, io.Discard); err != nil {
 			t.Fatal(err)
 		}
 
-		got := decodeFile(t, out)
+		got, err := fch.DecodeFile(out)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if got.PlayerStats[0].Value != 4 {
 			t.Fatalf("Deaths player stat = %v, want 4", got.PlayerStats[0].Value)
 		}
@@ -124,7 +134,7 @@ func TestRunShortFlags(t *testing.T) {
 	t.Run("no backup", func(t *testing.T) {
 		in := copyFixture(t, "Steam_333333_tugen.fch")
 
-		if err := run([]string{"-c", in, "-n", "set", "player-stat", "Deaths", "5"}, ioDiscard{}, ioDiscard{}); err != nil {
+		if err := run([]string{"-c", in, "-n", "set", "player-stat", "Deaths", "5"}, io.Discard, io.Discard); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
@@ -136,10 +146,13 @@ func TestRunShortFlags(t *testing.T) {
 		in := copyFixture(t, "Steam_333333_tugen.fch")
 
 		var stdout bytes.Buffer
-		if err := run([]string{"-c", in, "-d", "set", "player-stat", "Deaths", "6"}, &stdout, ioDiscard{}); err != nil {
+		if err := run([]string{"-c", in, "-d", "set", "player-stat", "Deaths", "6"}, &stdout, io.Discard); err != nil {
 			t.Fatal(err)
 		}
-		got := decodeFile(t, in)
+		got, err := fch.DecodeFile(in)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if got.PlayerStats[0].Value == 6 {
 			t.Fatal("dry run wrote the character file")
 		}
@@ -215,14 +228,20 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			in := copyFixture(t, "Steam_333333_tugen.fch")
-			before := decodeFile(t, in)
+			before, err := fch.DecodeFile(in)
+			if err != nil {
+				t.Fatal(err)
+			}
 			oldHash := append([]byte(nil), before.Trailer.Hash...)
 
 			args := append([]string{"--character", in, "--no-backup"}, tt.args...)
-			if err := run(args, ioDiscard{}, ioDiscard{}); err != nil {
+			if err := run(args, io.Discard, io.Discard); err != nil {
 				t.Fatalf("run(%v) error = %v", args, err)
 			}
-			after := decodeFile(t, in)
+			after, err := fch.DecodeFile(in)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if !after.Trailer.HashValid {
 				t.Fatal("Trailer.HashValid = false, want true")
@@ -248,12 +267,15 @@ func TestRunEditsOnlyRequestedCategory(t *testing.T) {
 func TestRunInPlace(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
-	err := run([]string{"--character", in, "set", "player-stat", "Deaths", "99"}, ioDiscard{}, ioDiscard{})
+	err := run([]string{"--character", in, "set", "player-stat", "Deaths", "99"}, io.Discard, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got := decodeFile(t, in)
+	got, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.PlayerStats[0].Value != 99 {
 		t.Fatalf("Deaths player stat = %v, want 99", got.PlayerStats[0].Value)
 	}
@@ -267,11 +289,14 @@ func TestRunUsesCharacterEnv(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	t.Setenv(characterEnv, in)
 
-	if err := run([]string{"set", "player-stat", "Deaths", "77"}, ioDiscard{}, ioDiscard{}); err != nil {
+	if err := run([]string{"set", "player-stat", "Deaths", "77"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 
-	got := decodeFile(t, in)
+	got, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.PlayerStats[0].Value != 77 {
 		t.Fatalf("Deaths player stat = %v, want 77", got.PlayerStats[0].Value)
 	}
@@ -283,15 +308,21 @@ func TestRunPrefersExplicitCharacter(t *testing.T) {
 	explicitPath := copyFixture(t, "Steam_333333_tugen.fch")
 	t.Setenv(characterEnv, envPath)
 
-	if err := run([]string{"--character", explicitPath, "set", "player-stat", "Deaths", "88"}, ioDiscard{}, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", explicitPath, "set", "player-stat", "Deaths", "88"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 
-	envCharacter := decodeFile(t, envPath)
+	envCharacter, err := fch.DecodeFile(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if envCharacter.PlayerStats[0].Value == 88 {
 		t.Fatal("environment character was edited despite explicit character argument")
 	}
-	explicitCharacter := decodeFile(t, explicitPath)
+	explicitCharacter, err := fch.DecodeFile(explicitPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if explicitCharacter.PlayerStats[0].Value != 88 {
 		t.Fatalf("explicit character Deaths = %v, want 88", explicitCharacter.PlayerStats[0].Value)
 	}
@@ -315,7 +346,7 @@ func TestRunRequiresCharacter(t *testing.T) {
 		}
 	}()
 
-	err := run([]string{"set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+	err := run([]string{"set", "player-stat", "Deaths", "1"}, io.Discard, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "missing character") {
 		t.Fatalf("run error = %v, want missing character", err)
 	}
@@ -331,14 +362,17 @@ func TestRunChainsSingleEditCommands(t *testing.T) {
 		{"--character", out, "add", "inventory", "Wood,stack=2,pos=2:2"},
 	}
 	for _, args := range commands {
-		if err := run(args, ioDiscard{}, ioDiscard{}); err != nil {
+		if err := run(args, io.Discard, io.Discard); err != nil {
 			t.Fatalf("run(%v) error = %v", args, err)
 		}
 	}
 
-	got := decodeFile(t, out)
-	wood := findItem(got.Player.Inventory, "Wood")
-	if wood == nil || wood.Stack != 2 {
+	got, err := fch.DecodeFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wood, ok := got.InventoryItem("Wood")
+	if !ok || wood.Stack != 2 {
 		t.Fatalf("Wood item = %+v, want final add to remain", wood)
 	}
 }
@@ -346,10 +380,13 @@ func TestRunChainsSingleEditCommands(t *testing.T) {
 func TestRunWritesInPlaceByDefault(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
-	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "1"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	got := decodeFile(t, in)
+	got, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.PlayerStats[0].Value != 1 {
 		t.Fatalf("Deaths player stat = %v, want 1", got.PlayerStats[0].Value)
 	}
@@ -360,7 +397,7 @@ func TestRunRejectsUnknownRemove(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
-	err := run([]string{"--character", in, "--out", out, "remove", "inventory", "DefinitelyMissing"}, ioDiscard{}, ioDiscard{})
+	err := run([]string{"--character", in, "--out", out, "remove", "inventory", "DefinitelyMissing"}, io.Discard, io.Discard)
 	if err == nil || err.Error() != `inventory item "DefinitelyMissing" not found` {
 		t.Fatalf("run error = %v, want missing inventory item", err)
 	}
@@ -368,39 +405,51 @@ func TestRunRejectsUnknownRemove(t *testing.T) {
 
 func TestRunAddsInventoryAtNextEmptySlot(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
-	before := decodeFile(t, in)
-	x, y, ok := nextEmptyInventorySlot(before.Player.Inventory)
+	before, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x, y, ok := before.EmptyInventorySlot()
 	if !ok {
 		t.Fatal("fixture has no empty inventory slot")
 	}
 
-	if err := run([]string{"--character", in, "add", "inventory", "Needle,stack=3"}, ioDiscard{}, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "add", "inventory", "Needle,stack=3"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 
-	after := decodeFile(t, in)
-	item := findSlot(after.Player.Inventory, x, y)
-	if item == nil || item.Name != "Needle" || item.Stack != 3 {
+	after, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, ok := after.InventorySlot(x, y)
+	if !ok || item.Name != "Needle" || item.Stack != 3 {
 		t.Fatalf("placed item = %+v, want Needle stack 3 at %d:%d", item, x, y)
 	}
 }
 
 func TestRunReplacesOccupiedInventorySlot(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
-	before := decodeFile(t, in)
+	before, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	occupied := before.Player.Inventory[0]
 	spec := fmt.Sprintf("Stone,stack=25,pos=%d:%d", occupied.GridX, occupied.GridY)
 
-	if err := run([]string{"--character", in, "add", "inventory", spec}, ioDiscard{}, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "add", "inventory", spec}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 
-	after := decodeFile(t, in)
+	after, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(after.Player.Inventory) != len(before.Player.Inventory) {
 		t.Fatalf("Inventory = %d, want %d", len(after.Player.Inventory), len(before.Player.Inventory))
 	}
-	item := findSlot(after.Player.Inventory, occupied.GridX, occupied.GridY)
-	if item == nil || item.Name != "Stone" || item.Stack != 25 || item.Durability != 100 {
+	item, ok := after.InventorySlot(occupied.GridX, occupied.GridY)
+	if !ok || item.Name != "Stone" || item.Stack != 25 || item.Durability != 100 {
 		t.Fatalf("replaced item = %+v, want Stone stack 25 at occupied slot", item)
 	}
 }
@@ -409,7 +458,7 @@ func TestRunRejectsUnknownSkill(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 	out := filepath.Join(t.TempDir(), "edited.fch")
 
-	err := run([]string{"--character", in, "--out", out, "set", "skill", "Nope", "1"}, ioDiscard{}, ioDiscard{})
+	err := run([]string{"--character", in, "--out", out, "set", "skill", "Nope", "1"}, io.Discard, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), `unknown skill "Nope"`) {
 		t.Fatalf("run error = %v, want unknown skill", err)
 	}
@@ -417,17 +466,24 @@ func TestRunRejectsUnknownSkill(t *testing.T) {
 
 func TestRunCreatesInPlaceBackup(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
-	before := readFile(t, in)
+	before, err := os.ReadFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var stdout bytes.Buffer
-	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	backup := in + ".bak"
 	if _, err := os.Stat(backup); err != nil {
 		t.Fatalf("backup stat error = %v", err)
 	}
-	if got := readFile(t, backup); !bytes.Equal(got, before) {
+	got, err := os.ReadFile(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, before) {
 		t.Fatal("backup did not preserve the pre-edit character file")
 	}
 	if !strings.Contains(stdout.String(), "backup "+backup) {
@@ -441,20 +497,26 @@ func TestRunReusesRecentInPlaceBackup(t *testing.T) {
 	backup := in + ".bak"
 	numberedBackup := in + ".bak.1"
 	backupData := []byte("first rollback point")
-	writeTestFile(t, backup, backupData)
+	if err := os.WriteFile(backup, backupData, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chtimes(backup, now.Add(-30*time.Minute), now.Add(-30*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout bytes.Buffer
-	err := runTimed([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}, func() time.Time {
+	err := runTimed([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, io.Discard, func() time.Time {
 		return now
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if got := readFile(t, backup); !bytes.Equal(got, backupData) {
+	got, err := os.ReadFile(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, backupData) {
 		t.Fatal("recent backup was overwritten")
 	}
 	if _, err := os.Stat(numberedBackup); !os.IsNotExist(err) {
@@ -467,23 +529,32 @@ func TestRunReusesRecentInPlaceBackup(t *testing.T) {
 
 func TestRunOverwritesStaleInPlaceBackup(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
-	before := readFile(t, in)
+	before, err := os.ReadFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	now := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
 	backup := in + ".bak"
-	writeTestFile(t, backup, []byte("old rollback point"))
+	if err := os.WriteFile(backup, []byte("old rollback point"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chtimes(backup, now.Add(-time.Hour-time.Second), now.Add(-time.Hour-time.Second)); err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout bytes.Buffer
-	err := runTimed([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}, func() time.Time {
+	err = runTimed([]string{"--character", in, "set", "player-stat", "Deaths", "3"}, &stdout, io.Discard, func() time.Time {
 		return now
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if got := readFile(t, backup); !bytes.Equal(got, before) {
+	got, err := os.ReadFile(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, before) {
 		t.Fatal("stale backup was not overwritten with the pre-edit character file")
 	}
 	if !strings.Contains(stdout.String(), "backup "+backup) {
@@ -494,7 +565,7 @@ func TestRunOverwritesStaleInPlaceBackup(t *testing.T) {
 func TestRunNoBackup(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
-	if err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "3"}, ioDiscard{}, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "3"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
@@ -506,14 +577,17 @@ func TestRunDryRunDoesNotWrite(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
 	var stdout bytes.Buffer
-	if err := run([]string{"--character", in, "--dry-run", "set", "player-stat", "Deaths", "3"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "--dry-run", "set", "player-stat", "Deaths", "3"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	got := decodeFile(t, in)
+	got, err := fch.DecodeFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.PlayerStats[0].Value == 3 {
 		t.Fatal("dry run wrote the character file")
 	}
-	if value, ok := customDataValue(got.Player.CustomData, fcheditLastModifiedKey); ok {
+	if value, ok := got.CustomData(fcheditLastModifiedKey); ok {
 		t.Fatalf("dry run wrote %s custom data value %q", fcheditLastModifiedKey, value)
 	}
 	if !strings.Contains(stdout.String(), "would set player-stat Deaths=3") {
@@ -529,7 +603,7 @@ func TestRunDryRunDoesNotWrite(t *testing.T) {
 
 func TestRunListsWithoutCharacter(t *testing.T) {
 	var stdout bytes.Buffer
-	if err := run([]string{"list", "player-stats"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"list", "player-stats"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "0    Deaths") {
@@ -537,7 +611,7 @@ func TestRunListsWithoutCharacter(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if err := run([]string{"list", "skills"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"list", "skills"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "Run") {
@@ -545,7 +619,7 @@ func TestRunListsWithoutCharacter(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if err := run([]string{"list", "items"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"list", "items"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "SwordIron") || !strings.Contains(stdout.String(), "max-quality=4") {
@@ -559,7 +633,7 @@ func TestRunListsWithoutCharacter(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if err := run([]string{"list", "items", "--all"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"list", "items", "--all"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "Abomination_attack1") || strings.Contains(stdout.String(), "inventory-valid") {
@@ -571,7 +645,7 @@ func TestRunListsInventory(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
 
 	var stdout bytes.Buffer
-	if err := run([]string{"--character", in, "list", "inventory"}, &stdout, ioDiscard{}); err != nil {
+	if err := run([]string{"--character", in, "list", "inventory"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "stack=") {
@@ -621,7 +695,7 @@ func TestRunRejectsUnsafeValues(t *testing.T) {
 		{"--character", in, "add", "inventory", "Wood,stack=0"},
 	}
 	for _, args := range tests {
-		if err := run(args, ioDiscard{}, ioDiscard{}); err == nil {
+		if err := run(args, io.Discard, io.Discard); err == nil {
 			t.Fatalf("run(%v) error = nil, want validation error", args)
 		}
 	}
@@ -629,16 +703,25 @@ func TestRunRejectsUnsafeValues(t *testing.T) {
 
 func TestRunRejectsInvalidTrailerHash(t *testing.T) {
 	in := copyFixture(t, "Steam_333333_tugen.fch")
-	before := readFile(t, in)
+	before, err := os.ReadFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
 	data := append([]byte(nil), before...)
 	data[12] ^= 1
-	writeTestFile(t, in, data)
+	if err := os.WriteFile(in, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-	err := run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, ioDiscard{}, ioDiscard{})
+	err = run([]string{"--character", in, "--no-backup", "set", "player-stat", "Deaths", "1"}, io.Discard, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "invalid trailer hash") {
 		t.Fatalf("run error = %v, want invalid trailer hash", err)
 	}
-	if got := readFile(t, in); !bytes.Equal(got, data) {
+	got, err := os.ReadFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
 		t.Fatal("fchedit modified a file with an invalid trailer hash")
 	}
 	if _, err := os.Stat(in + ".bak"); !os.IsNotExist(err) {
@@ -648,120 +731,27 @@ func TestRunRejectsInvalidTrailerHash(t *testing.T) {
 
 func copyFixture(t *testing.T, name string) string {
 	t.Helper()
-	data := readFile(t, filepath.Join("..", "..", "testdata", name))
+	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(t.TempDir(), name)
-	writeTestFile(t, path, data)
-	return path
-}
-
-func decodeFile(t *testing.T, path string) *valheim.Character {
-	t.Helper()
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-
-	got, err := fch.Decode(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return got
-}
-
-func readFile(t *testing.T, path string) []byte {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
-}
-
-func writeTestFile(t *testing.T, path string, data []byte) {
-	t.Helper()
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func findItem(items []valheim.Item, name string) *valheim.Item {
-	for i := range items {
-		if items[i].Name == name {
-			return &items[i]
-		}
-	}
-	return nil
-}
-
-func findSlot(items []valheim.Item, gridX int32, gridY int32) *valheim.Item {
-	for i := range items {
-		if items[i].GridX == gridX && items[i].GridY == gridY {
-			return &items[i]
-		}
-	}
-	return nil
-}
-
-func nextEmptyInventorySlot(items []valheim.Item) (int32, int32, bool) {
-	for y := int32(0); y < 4; y++ {
-		for x := int32(0); x < 8; x++ {
-			if findSlot(items, x, y) == nil {
-				return x, y, true
-			}
-		}
-	}
-	return 0, 0, false
-}
-
-func skillLevel(skills []valheim.Skill, skillType int32) float32 {
-	for _, skill := range skills {
-		if skill.Type == skillType {
-			return skill.Level
-		}
-	}
-	return 0
-}
-
-func statValue(entries []valheim.StatEntry, name string) float32 {
-	for _, entry := range entries {
-		if entry.Name == name {
-			return entry.Value
-		}
-	}
-	return 0
+	return path
 }
 
 func requireFcheditLastModified(t *testing.T, character *valheim.Character) string {
 	t.Helper()
-	value := requireCustomDataValue(t, character, fcheditLastModifiedKey)
-	requireTimestamp(t, fcheditLastModifiedKey, value, fcheditLastModifiedValue)
-	return value
-}
-
-func requireCustomDataValue(t *testing.T, character *valheim.Character, key string) string {
-	t.Helper()
-	value, ok := customDataValue(character.Player.CustomData, key)
+	value, ok := character.CustomData(fcheditLastModifiedKey)
 	if !ok {
-		t.Fatalf("missing %s custom data", key)
+		t.Fatalf("missing %s custom data", fcheditLastModifiedKey)
+	}
+	if _, err := time.Parse(fcheditLastModifiedValue, value); err != nil {
+		t.Fatalf("%s = %q, want %s timestamp: %v", fcheditLastModifiedKey, value, fcheditLastModifiedValue, err)
 	}
 	return value
-}
-
-func requireTimestamp(t *testing.T, name string, value string, layout string) {
-	t.Helper()
-	if _, err := time.Parse(layout, value); err != nil {
-		t.Fatalf("%s = %q, want %s timestamp: %v", name, value, layout, err)
-	}
-}
-
-func customDataValue(entries []valheim.TextEntry, key string) (string, bool) {
-	for _, entry := range entries {
-		if entry.Key == key {
-			return entry.Value, true
-		}
-	}
-	return "", false
 }
 
 func countCustomData(entries []valheim.TextEntry, key string) int {
@@ -772,10 +762,4 @@ func countCustomData(entries []valheim.TextEntry, key string) int {
 		}
 	}
 	return count
-}
-
-type ioDiscard struct{}
-
-func (ioDiscard) Write(p []byte) (int, error) {
-	return len(p), nil
 }
