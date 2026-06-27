@@ -259,6 +259,62 @@ func TestEncodeRejectsPlayerStatCountMismatch(t *testing.T) {
 	}
 }
 
+func TestEncodeRejectsUnsupportedDecodedShape(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*valheim.Character)
+		want string
+	}{
+		{
+			name: "character version",
+			edit: func(character *valheim.Character) {
+				character.Version++
+			},
+			want: "unsupported character version 44",
+		},
+		{
+			name: "player version",
+			edit: func(character *valheim.Character) {
+				character.Player.PlayerVersion++
+			},
+			want: "unsupported player version 30",
+		},
+		{
+			name: "inventory version",
+			edit: func(character *valheim.Character) {
+				character.Player.InventoryVersion++
+			},
+			want: "unsupported inventory version 107",
+		},
+		{
+			name: "skill version",
+			edit: func(character *valheim.Character) {
+				character.Player.SkillVersion++
+			},
+			want: "unsupported skill version 3",
+		},
+		{
+			name: "remaining bytes",
+			edit: func(character *valheim.Character) {
+				character.RemainingBytes = 4
+			},
+			want: "decoded character has 4 unread player bytes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			character := syntheticCharacter()
+			tt.edit(character)
+
+			_, err := EncodeBytes(character)
+			if err == nil || err.Error() != tt.want {
+				t.Fatalf("EncodeBytes error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func syntheticCharacter() *valheim.Character {
 	return &valheim.Character{
 		Version:         43,
