@@ -1,5 +1,3 @@
-# Valheim ObjectDB item prefabs extracted from local game assets.
-# inventoryValid is true for prefabs with localized shared item names; false rows are usually internal creature/effect equipment.
 # name	inventoryValid	recipes	baseDurability	durabilityStep	maxQuality	maxStack
 Abomination_attack1	false		100	50	1	1
 Abomination_attack2	false		100	50	1	1
