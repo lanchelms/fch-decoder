@@ -100,6 +100,17 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 	character.Player.EnemyStats = []valheim.StatEntry{
 		{Name: "$enemy_greyling", Value: 7},
 	}
+	character.Player.Health = 45
+	character.Player.MaxHealth = 100
+	character.Player.Stamina = 23
+	character.Player.MaxStamina = 75
+	character.Player.Eitr = 8
+	character.Player.MaxEitr = 50
+	character.Player.TimeSinceDeath = 89
+	character.Player.GuardianPower.Cooldown = 321
+	character.Player.KnownWorlds = []valheim.TimeEntry{
+		{Name: "Meadows", Seconds: 1234},
+	}
 	character.PlayerStats = []valheim.StatEntry{
 		{Name: "Deaths", Value: 3},
 		{Name: "DistanceTraveled", Value: 456},
@@ -132,6 +143,8 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 		"valheim_character_enemies":       {"player", "enemy"},
 		"valheim_character_stats":         {"player", "stat"},
 		"valheim_character_distance":      {"player", "mode"},
+		"valheim_character":               {"player", "state"},
+		"valheim_character_worlds":        {"player", "world"},
 		"valheim_character_scrape_errors": nil,
 	}
 	wantCount := map[string]int{
@@ -140,6 +153,8 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 		"valheim_character_enemies":       1,
 		"valheim_character_stats":         1,
 		"valheim_character_distance":      5,
+		"valheim_character":               8,
+		"valheim_character_worlds":        1,
 		"valheim_character_scrape_errors": 1,
 	}
 	got := metricFamilies(families)
@@ -169,6 +184,10 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 	assertMetricValue(t, got["valheim_character_stats"], 3, map[string]string{"player": "Fenris", "stat": "Deaths"})
 	assertMetricValue(t, got["valheim_character_distance"], 456, map[string]string{"player": "Fenris", "mode": "Total"})
 	assertMetricValue(t, got["valheim_character_distance"], 106, map[string]string{"player": "Fenris", "mode": "Sail"})
+	assertMetricValue(t, got["valheim_character"], 45, map[string]string{"player": "Fenris", "state": "Health"})
+	assertMetricValue(t, got["valheim_character"], 89, map[string]string{"player": "Fenris", "state": "TimeSinceDeath"})
+	assertMetricValue(t, got["valheim_character"], 321, map[string]string{"player": "Fenris", "state": "GuardianPowerCooldown"})
+	assertMetricValue(t, got["valheim_character_worlds"], 1234, map[string]string{"player": "Fenris", "world": "Meadows"})
 	assertMetricValue(t, got["valheim_character_scrape_errors"], 2, nil)
 }
 
@@ -286,17 +305,19 @@ func TestLoadSnapshotFromFixtures(t *testing.T) {
 		seen := map[*prometheus.Desc]bool{}
 		for _, sample := range character.samples {
 			seen[sample.desc] = true
-			if len(sample.labels) != 2 {
-				t.Fatalf("metric has labels %v, want player and metric label", sample.labels)
+			if len(sample.labels) == 0 || sample.labels[0] != character.player {
+				t.Fatalf("metric has labels %v, want player first", sample.labels)
 			}
-			if strings.Contains(sample.labels[1], "$") {
-				t.Fatalf("metric label %q contains $", sample.labels[1])
+			for _, label := range sample.labels[1:] {
+				if strings.Contains(label, "$") {
+					t.Fatalf("metric label %q contains $", label)
+				}
 			}
 			if sample.desc == skillsDesc && sample.value != math.Floor(sample.value) {
 				t.Fatalf("skill metric %q = %v, want integer", sample.labels[1], sample.value)
 			}
 		}
-		for _, desc := range []*prometheus.Desc{skillsDesc, craftingDesc, enemiesDesc, statsDesc, distanceDesc} {
+		for _, desc := range []*prometheus.Desc{skillsDesc, craftingDesc, enemiesDesc, statsDesc, distanceDesc, characterDesc, knownWorldsDesc} {
 			if !seen[desc] {
 				t.Fatalf("character %q is missing metrics for %v", character.player, desc)
 			}

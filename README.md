@@ -117,6 +117,16 @@ fchedit --character character.fch --out edited.fch set player-stat Deaths 0
 
 `fchprom` serves metrics from a Valheim `characters_local` directory.
 
+Exported character metrics:
+
+- `valheim_character_skills{player,skill}`
+- `valheim_character_crafting{player,recipe}`
+- `valheim_character_enemies{player,enemy}`
+- `valheim_character_stats{player,stat}`
+- `valheim_character_distance{player,mode}`
+- `valheim_character{player,state}`
+- `valheim_character_worlds{player,world}`
+
 ```text
 --dir STRING              Valheim characters_local directory.
 --addr STRING             Address to serve Prometheus metrics on. Default: :9108.

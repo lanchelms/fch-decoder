@@ -56,6 +56,18 @@ var (
 		[]string{"player", "mode"},
 		nil,
 	)
+	characterDesc = prometheus.NewDesc(
+		"valheim_character",
+		"Valheim character scalar state values.",
+		[]string{"player", "state"},
+		nil,
+	)
+	knownWorldsDesc = prometheus.NewDesc(
+		"valheim_character_worlds",
+		"Valheim character accumulated elapsed seconds observed in each known world.",
+		[]string{"player", "world"},
+		nil,
+	)
 	scrapeErrorsDesc = prometheus.NewDesc(
 		"valheim_character_scrape_errors",
 		"Number of Valheim character files or directories that could not be scraped.",
@@ -68,6 +80,8 @@ var (
 		enemiesDesc,
 		statsDesc,
 		distanceDesc,
+		characterDesc,
+		knownWorldsDesc,
 		scrapeErrorsDesc,
 	}
 )
@@ -118,6 +132,61 @@ var allowedPlayerStats = map[string]bool{
 	"BossLastHits":          true,
 }
 
+var legacyFlags = map[string]bool{
+	"addr":         true,
+	"dir":          true,
+	"metrics-path": true,
+	"workers":      true,
+	"cache-ttl":    true,
+}
+
+type cli struct {
+	Addr        string        `name:"addr" default:":9108" help:"Address to serve Prometheus metrics on."`
+	Dir         string        `name:"dir" required:"" type:"path" help:"Valheim characters_local directory."`
+	MetricsPath string        `name:"metrics-path" default:"/metrics" help:"Prometheus metrics path."`
+	Workers     int           `name:"workers" default:"${num_cpu}" help:"Maximum number of character files to decode in parallel."`
+	CacheTTL    time.Duration `name:"cache-ttl" default:"5s" help:"How long to reuse decoded metrics between scrapes."`
+}
+
+func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
+	var cli cli
+	parser, err := kong.New(
+		&cli,
+		kong.Name("fchprom"),
+		kong.Description("Serve Prometheus metrics from a directory of Valheim character files."),
+		kong.Writers(stdout, stderr),
+		kong.Vars{"num_cpu": strconv.Itoa(runtime.NumCPU())},
+	)
+	if err != nil {
+		return cli, err
+	}
+	if _, err := parser.Parse(normalizeFlags(args, legacyFlags)); err != nil {
+		return cli, err
+	}
+	return cli, nil
+}
+
+func normalizeFlags(args []string, names map[string]bool) []string {
+	normalized := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--") || !strings.HasPrefix(arg, "-") || arg == "-" {
+			normalized = append(normalized, arg)
+			continue
+		}
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
+		if !names[name] {
+			normalized = append(normalized, arg)
+			continue
+		}
+		if hasValue {
+			normalized = append(normalized, "--"+name+"="+value)
+		} else {
+			normalized = append(normalized, "--"+name)
+		}
+	}
+	return normalized
+}
+
 type collector struct {
 	dir      string
 	workers  int
@@ -162,116 +231,6 @@ func (c *collector) getSnapshot() snapshot {
 type snapshot struct {
 	characters []metrics
 	errors     int
-}
-
-type metrics struct {
-	player  string
-	samples []sample
-}
-
-func (m *metrics) addStats(desc *prometheus.Desc, entries []valheim.StatEntry) {
-	for _, entry := range entries {
-		name := cleanMetricLabel(entry.Name, desc)
-		if name == "" {
-			continue
-		}
-		m.add(desc, float64(entry.Value), name)
-	}
-}
-
-func (m *metrics) add(desc *prometheus.Desc, value float64, label string) {
-	m.samples = append(m.samples, sample{
-		desc:   desc,
-		value:  value,
-		labels: []string{m.player, label},
-	})
-}
-
-type sample struct {
-	desc   *prometheus.Desc
-	value  float64
-	labels []string
-}
-
-type cli struct {
-	Addr        string        `name:"addr" default:":9108" help:"Address to serve Prometheus metrics on."`
-	Dir         string        `name:"dir" required:"" type:"path" help:"Valheim characters_local directory."`
-	MetricsPath string        `name:"metrics-path" default:"/metrics" help:"Prometheus metrics path."`
-	Workers     int           `name:"workers" default:"${num_cpu}" help:"Maximum number of character files to decode in parallel."`
-	CacheTTL    time.Duration `name:"cache-ttl" default:"5s" help:"How long to reuse decoded metrics between scrapes."`
-}
-
-func main() {
-	cli, err := parseCLI(os.Args[1:], os.Stdout, os.Stderr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	serve(cli)
-}
-
-func serve(cli cli) {
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(&collector{
-		dir:      cli.Dir,
-		workers:  cli.Workers,
-		cacheTTL: cli.CacheTTL,
-	})
-
-	mux := http.NewServeMux()
-	mux.Handle(cli.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Valheim character metrics at %s\n", cli.MetricsPath)
-	})
-
-	log.Printf("serving Valheim character metrics on %s from %s", cli.Addr, cli.Dir)
-	log.Fatal(http.ListenAndServe(cli.Addr, mux))
-}
-
-func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
-	var cli cli
-	parser, err := kong.New(
-		&cli,
-		kong.Name("fchprom"),
-		kong.Description("Serve Prometheus metrics from a directory of Valheim character files."),
-		kong.Writers(stdout, stderr),
-		kong.Vars{"num_cpu": strconv.Itoa(runtime.NumCPU())},
-	)
-	if err != nil {
-		return cli, err
-	}
-	if _, err := parser.Parse(normalizeFlags(args, legacyFlags)); err != nil {
-		return cli, err
-	}
-	return cli, nil
-}
-
-var legacyFlags = map[string]bool{
-	"addr":         true,
-	"dir":          true,
-	"metrics-path": true,
-	"workers":      true,
-	"cache-ttl":    true,
-}
-
-func normalizeFlags(args []string, names map[string]bool) []string {
-	normalized := make([]string, 0, len(args))
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--") || !strings.HasPrefix(arg, "-") || arg == "-" {
-			normalized = append(normalized, arg)
-			continue
-		}
-		name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
-		if !names[name] {
-			normalized = append(normalized, arg)
-			continue
-		}
-		if hasValue {
-			normalized = append(normalized, "--"+name+"="+value)
-		} else {
-			normalized = append(normalized, "--"+name)
-		}
-	}
-	return normalized
 }
 
 func loadSnapshot(dir string, workers int) snapshot {
@@ -319,6 +278,17 @@ func loadSnapshot(dir string, workers int) snapshot {
 	return snap
 }
 
+type sample struct {
+	desc   *prometheus.Desc
+	value  float64
+	labels []string
+}
+
+type metrics struct {
+	player  string
+	samples []sample
+}
+
 func loadMetrics(path string) (metrics, error) {
 	character, err := fch.DecodeFile(path)
 	if err != nil {
@@ -344,7 +314,35 @@ func newMetrics(character *valheim.Character) metrics {
 		out.add(statsDesc, float64(stat.Value), stat.Name)
 	}
 	out.addDistanceStats(character.PlayerStats)
+	out.addCharacterState(character.Player)
+	for _, world := range character.Player.KnownWorlds {
+		if world.Name == "" {
+			continue
+		}
+		out.add(knownWorldsDesc, float64(world.Seconds), world.Name)
+	}
 	return out
+}
+
+func (m *metrics) addStats(desc *prometheus.Desc, entries []valheim.StatEntry) {
+	for _, entry := range entries {
+		name := cleanMetricLabel(entry.Name, desc)
+		if name == "" {
+			continue
+		}
+		m.add(desc, float64(entry.Value), name)
+	}
+}
+
+func (m *metrics) addCharacterState(player valheim.Player) {
+	m.add(characterDesc, float64(player.Health), "Health")
+	m.add(characterDesc, float64(player.MaxHealth), "MaxHealth")
+	m.add(characterDesc, float64(player.Stamina), "Stamina")
+	m.add(characterDesc, float64(player.MaxStamina), "MaxStamina")
+	m.add(characterDesc, float64(player.Eitr), "Eitr")
+	m.add(characterDesc, float64(player.MaxEitr), "MaxEitr")
+	m.add(characterDesc, float64(player.TimeSinceDeath), "TimeSinceDeath")
+	m.add(characterDesc, float64(player.GuardianPower.Cooldown), "GuardianPowerCooldown")
 }
 
 func (m *metrics) addDistanceStats(entries []valheim.StatEntry) {
@@ -370,6 +368,40 @@ func (m *metrics) addDistanceStats(entries []valheim.StatEntry) {
 	m.add(distanceDesc, run, "Run")
 	m.add(distanceDesc, sail, "Sail")
 	m.add(distanceDesc, air, "Air")
+}
+
+func (m *metrics) add(desc *prometheus.Desc, value float64, label string) {
+	m.samples = append(m.samples, sample{
+		desc:   desc,
+		value:  value,
+		labels: []string{m.player, label},
+	})
+}
+
+func main() {
+	cli, err := parseCLI(os.Args[1:], os.Stdout, os.Stderr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	serve(cli)
+}
+
+func serve(cli cli) {
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(&collector{
+		dir:      cli.Dir,
+		workers:  cli.Workers,
+		cacheTTL: cli.CacheTTL,
+	})
+
+	mux := http.NewServeMux()
+	mux.Handle(cli.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Valheim character metrics at %s\n", cli.MetricsPath)
+	})
+
+	log.Printf("serving Valheim character metrics on %s from %s", cli.Addr, cli.Dir)
+	log.Fatal(http.ListenAndServe(cli.Addr, mux))
 }
 
 func characterFiles(dir string) ([]string, error) {
