@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	fch "github.com/lanchelms/fch-decoder"
 	"github.com/lanchelms/fch-decoder/valheim"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -182,13 +183,13 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 }
 
 func TestDistanceMetricsInferSailingDistance(t *testing.T) {
-	character, err := loadMetrics(filepath.Join("..", "..", "testdata", "Steam_333333_tugen.fch"))
+	character, err := fch.DecodeFile(filepath.Join("..", "..", "testdata", "Steam_333333_tugen.fch"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	distances := map[string]float64{}
-	for _, sample := range character.samples {
+	for _, sample := range newMetrics(character).samples {
 		if sample.desc == distanceDesc {
 			distances[sample.labels[1]] = sample.value
 		}

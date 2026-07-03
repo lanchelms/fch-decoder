@@ -23,8 +23,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-const defaultCacheTTL = 5 * time.Second
-
 var (
 	skillsDesc = prometheus.NewDesc(
 		"valheim_character_skills",
@@ -158,6 +156,32 @@ func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
 	return cli, nil
 }
 
+func main() {
+	cli, err := parseCLI(os.Args[1:], os.Stdout, os.Stderr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	serve(cli)
+}
+
+func serve(cli cli) {
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(&collector{
+		dir:      cli.Dir,
+		workers:  cli.Workers,
+		cacheTTL: cli.CacheTTL,
+	})
+
+	mux := http.NewServeMux()
+	mux.Handle(cli.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Valheim character metrics at %s\n", cli.MetricsPath)
+	})
+
+	log.Printf("serving Valheim character metrics on %s from %s", cli.Addr, cli.Dir)
+	log.Fatal(http.ListenAndServe(cli.Addr, mux))
+}
+
 type collector struct {
 	dir      string
 	workers  int
@@ -176,8 +200,8 @@ func (c *collector) Describe(ch chan<- *prometheus.Desc) {
 
 func (c *collector) Collect(ch chan<- prometheus.Metric) {
 	snap := c.getSnapshot()
-	for _, character := range snap.characters {
-		for _, sample := range character.samples {
+	for _, metrics := range snap.characters {
+		for _, sample := range metrics.samples {
 			ch <- prometheus.MustNewConstMetric(sample.desc, prometheus.GaugeValue, sample.value, sample.labels...)
 		}
 	}
@@ -227,13 +251,13 @@ func loadSnapshot(dir string, workers int) snapshot {
 		go func() {
 			defer wg.Done()
 			for path := range pathCh {
-				metrics, err := loadMetrics(path)
+				character, err := fch.DecodeFile(path)
 				mu.Lock()
 				if err != nil {
 					log.Printf("cannot scrape character file %s: %v", path, err)
 					snap.errors++
 				} else {
-					snap.characters = append(snap.characters, metrics)
+					snap.characters = append(snap.characters, newMetrics(character))
 				}
 				mu.Unlock()
 			}
@@ -258,14 +282,6 @@ type sample struct {
 type metrics struct {
 	player  string
 	samples []sample
-}
-
-func loadMetrics(path string) (metrics, error) {
-	character, err := fch.DecodeFile(path)
-	if err != nil {
-		return metrics{}, err
-	}
-	return newMetrics(character), nil
 }
 
 func newMetrics(character *valheim.Character) metrics {
@@ -347,32 +363,6 @@ func (m *metrics) add(desc *prometheus.Desc, value float64, label string) {
 		value:  value,
 		labels: []string{m.player, label},
 	})
-}
-
-func main() {
-	cli, err := parseCLI(os.Args[1:], os.Stdout, os.Stderr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	serve(cli)
-}
-
-func serve(cli cli) {
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(&collector{
-		dir:      cli.Dir,
-		workers:  cli.Workers,
-		cacheTTL: cli.CacheTTL,
-	})
-
-	mux := http.NewServeMux()
-	mux.Handle(cli.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Valheim character metrics at %s\n", cli.MetricsPath)
-	})
-
-	log.Printf("serving Valheim character metrics on %s from %s", cli.Addr, cli.Dir)
-	log.Fatal(http.ListenAndServe(cli.Addr, mux))
 }
 
 func characterFiles(dir string) ([]string, error) {
