@@ -15,22 +15,12 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-func TestParseCLIAcceptsLegacyComposeFlags(t *testing.T) {
-	cli, err := parseCLI([]string{"-dir", "/characters", "-addr", ":9108"}, io.Discard, io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cli.Dir != "/characters" || cli.Addr != ":9108" || cli.MetricsPath != "/metrics" || cli.Workers < 1 || cli.CacheTTL != defaultCacheTTL {
-		t.Fatalf("cli = %+v", cli)
-	}
-}
-
 func TestParseCLIAcceptsKongFlags(t *testing.T) {
 	cli, err := parseCLI([]string{"--dir", "/characters", "--metrics-path", "/custom", "--workers", "2", "--cache-ttl", "10s"}, io.Discard, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cli.Dir != "/characters" || cli.MetricsPath != "/custom" || cli.Workers != 2 || cli.CacheTTL.String() != "10s" {
+	if cli.Dir != "/characters" || cli.Addr != ":9108" || cli.MetricsPath != "/custom" || cli.Workers != 2 || cli.CacheTTL.String() != "10s" {
 		t.Fatalf("cli = %+v", cli)
 	}
 }

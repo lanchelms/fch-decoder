@@ -132,14 +132,6 @@ var allowedPlayerStats = map[string]bool{
 	"BossLastHits":          true,
 }
 
-var legacyFlags = map[string]bool{
-	"addr":         true,
-	"dir":          true,
-	"metrics-path": true,
-	"workers":      true,
-	"cache-ttl":    true,
-}
-
 type cli struct {
 	Addr        string        `name:"addr" default:":9108" help:"Address to serve Prometheus metrics on."`
 	Dir         string        `name:"dir" required:"" type:"path" help:"Valheim characters_local directory."`
@@ -160,31 +152,10 @@ func parseCLI(args []string, stdout io.Writer, stderr io.Writer) (cli, error) {
 	if err != nil {
 		return cli, err
 	}
-	if _, err := parser.Parse(normalizeFlags(args, legacyFlags)); err != nil {
+	if _, err := parser.Parse(args); err != nil {
 		return cli, err
 	}
 	return cli, nil
-}
-
-func normalizeFlags(args []string, names map[string]bool) []string {
-	normalized := make([]string, 0, len(args))
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--") || !strings.HasPrefix(arg, "-") || arg == "-" {
-			normalized = append(normalized, arg)
-			continue
-		}
-		name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
-		if !names[name] {
-			normalized = append(normalized, arg)
-			continue
-		}
-		if hasValue {
-			normalized = append(normalized, "--"+name+"="+value)
-		} else {
-			normalized = append(normalized, "--"+name)
-		}
-	}
-	return normalized
 }
 
 type collector struct {
