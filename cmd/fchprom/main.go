@@ -247,9 +247,7 @@ func loadSnapshot(dir string, workers int) snapshot {
 	var snap snapshot
 
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for path := range pathCh {
 				character, err := fch.DecodeFile(path)
 				mu.Lock()
@@ -261,7 +259,7 @@ func loadSnapshot(dir string, workers int) snapshot {
 				}
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 
 	for _, path := range paths {

@@ -143,8 +143,8 @@ func TestCharacterQueryMethods(t *testing.T) {
 
 func TestPlaceInventoryItemRejectsFullInventory(t *testing.T) {
 	character := &Character{}
-	for y := int32(0); y < inventoryHeight; y++ {
-		for x := int32(0); x < inventoryWidth; x++ {
+	for y := range inventoryHeight {
+		for x := range inventoryWidth {
 			character.AddInventoryItem(Item{Name: "Wood", GridX: x, GridY: y})
 		}
 	}

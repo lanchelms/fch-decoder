@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	inventoryWidth  = 8
-	inventoryHeight = 4
+	inventoryWidth  int32 = 8
+	inventoryHeight int32 = 4
 )
 
 const (
@@ -174,8 +174,8 @@ func (c *Character) InventorySlot(x, y int32) (*Item, bool) {
 
 // EmptyInventorySlot returns the first empty normal inventory slot.
 func (c *Character) EmptyInventorySlot() (int32, int32, bool) {
-	for y := int32(0); y < inventoryHeight; y++ {
-		for x := int32(0); x < inventoryWidth; x++ {
+	for y := range inventoryHeight {
+		for x := range inventoryWidth {
 			if _, occupied := c.InventorySlot(x, y); !occupied {
 				return x, y, true
 			}
