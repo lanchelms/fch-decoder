@@ -12,9 +12,20 @@ Decode, inspect, edit, and export metrics from Valheim `.fch` character files.
 Use it as a Go library, one-shot JSON dumper, character editor, or Prometheus
 scrape target.
 
-Supports character/player/inventory/skill versions **43/29/106/2** and
-**46/33/109/2**. Encoding preserves source versions; new-character constructors
-retain the legacy defaults. Unsupported layouts are rejected.
+Supports `.fch` character file versions **43** (Valheim Early Access, pre-1.0)
+and **46** (Valheim 1.0). Throughout this
+documentation, “version 43” and “version 46” refer to the file version
+(`Character.Version`, or the top-level `version` in JSON).
+
+The embedded data has separate format versions:
+
+| Character file version | Player data version | Inventory version | Skill version |
+| --- | --- | --- | --- |
+| 43 | 29 | 106 | 2 |
+| 46 | 33 | 109 | 2 |
+
+Encoding preserves source versions; new-character constructors default to file
+version 43 and its embedded data versions. Unsupported layouts are rejected.
 
 Version 46 retains ten statistics groups, string biome names, compact inventory
 records, and the opaque build-menu blob. Prefab hashes resolve through the bundled
