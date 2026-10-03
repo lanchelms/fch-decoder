@@ -132,7 +132,7 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 		"valheim_character_skills":        {"player", "skill"},
 		"valheim_character_crafting":      {"player", "recipe"},
 		"valheim_character_enemies":       {"player", "enemy"},
-		"valheim_character_stats":         {"player", "stat"},
+		"valheim_character_stats":         {"player", "group", "stat"},
 		"valheim_character_distance":      {"player", "mode"},
 		"valheim_character":               {"player", "state"},
 		"valheim_character_worlds":        {"player", "world"},
@@ -172,7 +172,7 @@ func TestCollectorMetricFamiliesHaveExpectedShape(t *testing.T) {
 	assertMetricValue(t, got["valheim_character_skills"], 34, map[string]string{"player": "Fenris", "skill": "Run"})
 	assertMetricValue(t, got["valheim_character_crafting"], 12, map[string]string{"player": "Fenris", "recipe": "ArrowFire"})
 	assertMetricValue(t, got["valheim_character_enemies"], 7, map[string]string{"player": "Fenris", "enemy": "Greyling"})
-	assertMetricValue(t, got["valheim_character_stats"], 3, map[string]string{"player": "Fenris", "stat": "Deaths"})
+	assertMetricValue(t, got["valheim_character_stats"], 3, map[string]string{"player": "Fenris", "group": "RawStats", "stat": "Deaths"})
 	assertMetricValue(t, got["valheim_character_distance"], 456, map[string]string{"player": "Fenris", "mode": "Total"})
 	assertMetricValue(t, got["valheim_character_distance"], 106, map[string]string{"player": "Fenris", "mode": "Sail"})
 	assertMetricValue(t, got["valheim_character"], 45, map[string]string{"player": "Fenris", "state": "Health"})
@@ -193,7 +193,7 @@ func TestDistanceMetricsInferSailingDistance(t *testing.T) {
 		if sample.desc == distanceDesc {
 			distances[sample.labels[1]] = sample.value
 		}
-		if sample.desc == statsDesc && strings.HasPrefix(sample.labels[1], "Distance") {
+		if sample.desc == statsDesc && strings.HasPrefix(sample.labels[2], "Distance") {
 			t.Fatalf("raw distance stat %q exported through stats metric", sample.labels[1])
 		}
 	}
@@ -282,8 +282,8 @@ func TestLoadSnapshotFromFixtures(t *testing.T) {
 	if snap.errors != 0 {
 		t.Fatalf("snapshot errors = %d, want 0", snap.errors)
 	}
-	if len(snap.characters) != 3 {
-		t.Fatalf("snapshot characters = %d, want 3", len(snap.characters))
+	if len(snap.characters) != 4 {
+		t.Fatalf("snapshot characters = %d, want 4", len(snap.characters))
 	}
 
 	for _, character := range snap.characters {
@@ -308,10 +308,131 @@ func TestLoadSnapshotFromFixtures(t *testing.T) {
 				t.Fatalf("skill metric %q = %v, want integer", sample.labels[1], sample.value)
 			}
 		}
-		for _, desc := range []*prometheus.Desc{skillsDesc, craftingDesc, enemiesDesc, statsDesc, distanceDesc, characterDesc, knownWorldsDesc} {
+		descs := []*prometheus.Desc{skillsDesc, craftingDesc, enemiesDesc, statsDesc, distanceDesc, characterDesc, knownWorldsDesc}
+		if character.player == "Nichael" {
+			descs = []*prometheus.Desc{skillsDesc, statsDesc, characterDesc, enemyKillsDesc, itemsCraftedDesc, worldTimeDesc}
+		}
+		for _, desc := range descs {
 			if !seen[desc] {
 				t.Fatalf("character %q is missing metrics for %v", character.player, desc)
 			}
 		}
+	}
+}
+
+func TestMixedVersionRegisteredCollector(t *testing.T) {
+	c := &collector{cacheTTL: time.Hour, cachedAt: time.Now(), cached: loadSnapshot(filepath.Join("..", "..", "testdata"), 2)}
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(c)
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := metricFamilies(families)
+	stats := got["valheim_character_stats"]
+	groups := map[string]int{}
+	for _, metric := range stats.Metric {
+		labels := map[string]string{}
+		for _, label := range metric.Label {
+			labels[label.GetName()] = label.GetValue()
+		}
+		if labels["player"] == "Nichael" {
+			groups[labels["group"]]++
+		} else if labels["group"] != "RawStats" {
+			t.Fatal("legacy group missing")
+		}
+	}
+	if len(groups) != 10 {
+		t.Fatalf("groups = %v", groups)
+	}
+	for g, n := range groups {
+		if n != 205 {
+			t.Fatalf("%s has %d scalars", g, n)
+		}
+	}
+	for _, name := range []string{"crafting", "enemies", "distance", "worlds"} {
+		for _, metric := range got["valheim_character_"+name].Metric {
+			for _, label := range metric.Label {
+				if label.GetName() == "player" && label.GetValue() == "Nichael" {
+					t.Fatalf("duplicate compatibility family %s", name)
+				}
+			}
+		}
+	}
+	assertMetricValue(t, stats, 34, map[string]string{"player": "Nichael", "group": "RawStats", "stat": "Deaths"})
+	assertMetricValue(t, stats, 0, map[string]string{"player": "Nichael", "group": "Default", "stat": "Deaths"})
+	for name, labels := range map[string][]string{
+		"enemy_kills": {"player", "group", "modifier", "enemy"}, "items_crafted": {"player", "group", "item"}, "items_picked_up": {"player", "group", "item"}, "foods_eaten": {"player", "group", "food"}, "pieces_placed": {"player", "group", "piece"}, "world_time_seconds": {"player", "group", "world"}, "world_key_time_seconds": {"player", "group", "key", "setting"},
+	} {
+		family := got["valheim_character_"+name]
+		if name == "pickables" {
+			if family != nil {
+				t.Fatal("fabricated pickables")
+			}
+			continue
+		}
+		if family == nil {
+			t.Fatalf("missing %s", name)
+		}
+		if !sameStringSet(labelNames(family.Metric[0]), labels) {
+			t.Fatalf("bad %s labels", name)
+		}
+	}
+}
+
+func TestGroupActivityAndWorldKeyMetrics(t *testing.T) {
+	character, err := fch.DecodeFile(filepath.Join("..", "..", "testdata", "Steam_444444_nichael.fch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	character.StatGroups[6].Pickables = []valheim.StatEntry{{Name: "$raspberry", Value: 2}}
+	for i := range character.StatGroups[6].EnemyStats {
+		character.StatGroups[6].EnemyStats[i] = []valheim.StatEntry{{Name: "$enemy_greyling", Value: float32(i + 1)}}
+	}
+	c := &collector{cacheTTL: time.Hour, cachedAt: time.Now(), cached: snapshot{characters: []metrics{newMetrics(character)}}}
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(c)
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := metricFamilies(families)
+	assertMetricValue(t, got["valheim_character_pickables"], 2, map[string]string{"player": "Nichael", "group": "Default", "pickable": "raspberry"})
+	for i, modifier := range []string{"MixedAndTotal", "Unarmed", "Magic", "Ranged", "Melee"} {
+		assertMetricValue(t, got["valheim_character_enemy_kills"], float64(i+1), map[string]string{"player": "Nichael", "group": "Default", "modifier": modifier, "enemy": "Greyling"})
+	}
+	assertMetricValue(t, got["valheim_character_world_key_time_seconds"], 14673, map[string]string{"player": "Nichael", "group": "RawStats", "key": "nomap", "setting": ""})
+}
+
+func TestWorldKeyMetricsTrimAndSum(t *testing.T) {
+	character := valheim.NewCharacter("Trim", 1)
+	character.Version = 46
+	character.StatGroups = []valheim.StatGroup{
+		{Name: "RawStats", KnownWorldKeys: []valheim.WorldKey{
+			valheim.NewWorldKey("nomap", 2),
+			valheim.NewWorldKey("nomap ", 3),
+			valheim.NewWorldKey("  nomap  ", 5),
+			valheim.NewWorldKey(" nomap default ", 7),
+			valheim.NewWorldKey("nomap default", 11),
+			valheim.NewWorldKey("   ", 13),
+		}},
+		{Name: "Default", KnownWorldKeys: []valheim.WorldKey{valheim.NewWorldKey("nomap", 17)}},
+	}
+	c := &collector{cacheTTL: time.Hour, cachedAt: time.Now(), cached: snapshot{characters: []metrics{newMetrics(character)}}}
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(c)
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	family := metricFamilies(families)["valheim_character_world_key_time_seconds"]
+	if len(family.Metric) != 3 {
+		t.Fatalf("expected three normalized series, got %d", len(family.Metric))
+	}
+	assertMetricValue(t, family, 10, map[string]string{"player": "Trim", "group": "RawStats", "key": "nomap", "setting": ""})
+	assertMetricValue(t, family, 18, map[string]string{"player": "Trim", "group": "RawStats", "key": "nomap", "setting": "default"})
+	assertMetricValue(t, family, 17, map[string]string{"player": "Trim", "group": "Default", "key": "nomap", "setting": ""})
+	if character.StatGroups[0].KnownWorldKeys[2].Raw != "  nomap  " {
+		t.Fatal("export changed the saved world key")
 	}
 }

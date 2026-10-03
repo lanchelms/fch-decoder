@@ -101,6 +101,9 @@ func (r *Reader) read7BitEncodedInt() int {
 	var shift uint
 	for shift != 35 {
 		b := r.Byte()
+		if shift == 28 && b > 7 {
+			panic(fmt.Errorf("fch: invalid 7-bit encoded integer"))
+		}
 		count |= uint32(b&0x7f) << shift
 		if b&0x80 == 0 {
 			return int(count)
@@ -108,4 +111,13 @@ func (r *Reader) read7BitEncodedInt() int {
 		shift += 7
 	}
 	panic(fmt.Errorf("fch: invalid 7-bit encoded integer"))
+}
+
+func (r *Reader) Uint16() uint16 { return binary.LittleEndian.Uint16(r.Bytes(2)) }
+func (r *Reader) NumItems() int {
+	n := int(r.Byte())
+	if n&128 != 0 {
+		n = (n&127)<<8 | int(r.Byte())
+	}
+	return n
 }

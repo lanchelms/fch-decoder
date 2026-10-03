@@ -1,9 +1,9 @@
 package valheim
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+	wire "github.com/lanchelms/fch-decoder/binary"
 )
 
 type Map struct {
@@ -14,42 +14,27 @@ type Map struct {
 }
 
 func readMapSection(data []byte, startOffset int, payloadEnd int) (Map, int, error) {
-	firstSpawn, worldCount, ok := readMapPrefix(data, startOffset, payloadEnd)
-	if ok && firstSpawn <= 1 && worldCount == 0 {
-		return Map{
-			Offset: startOffset,
-			Raw:    append([]byte(nil), data[startOffset:startOffset+5]...),
-		}, startOffset + 5, nil
+	r := wire.NewReader(data).Slice(startOffset, payloadEnd)
+	m := Map{Offset: startOffset}
+	r.Bool()
+	count := r.Uint32()
+	if uint64(count)*60 > uint64(r.Remaining()) {
+		return m, 0, fmt.Errorf("fch: invalid world count %d", count)
 	}
-
-	gzipOffset := bytes.Index(data[startOffset:], []byte{0x1f, 0x8b, 0x08})
-	if gzipOffset < 0 {
-		return Map{}, 0, fmt.Errorf("fch: gzip map block not found")
+	for range count {
+		r.Bytes(59)
+		if r.Bool() {
+			n := r.Uint32()
+			offset := startOffset + r.Position()
+			blob := r.Bytes(int(n))
+			if len(blob) >= 8 {
+				m.StoredLength = n
+				m.CompressedLength = binary.LittleEndian.Uint32(blob[4:8])
+				m.Offset = offset + 8
+			}
+		}
 	}
-	gzipOffset += startOffset
-	if gzipOffset < 12 {
-		return Map{}, 0, fmt.Errorf("fch: gzip map block starts too early")
-	}
-
-	storedLen := binary.LittleEndian.Uint32(data[gzipOffset-12 : gzipOffset-8])
-	compressedLen := binary.LittleEndian.Uint32(data[gzipOffset-4 : gzipOffset])
-	if gzipOffset+int(compressedLen) > payloadEnd {
-		return Map{}, 0, fmt.Errorf("fch: invalid compressed map length %d at offset %d", compressedLen, gzipOffset)
-	}
-
-	return Map{
-		Offset:           gzipOffset,
-		CompressedLength: compressedLen,
-		StoredLength:     storedLen,
-		Raw:              append([]byte(nil), data[startOffset:gzipOffset+int(compressedLen)]...),
-	}, gzipOffset + int(compressedLen), nil
-}
-
-func readMapPrefix(data []byte, startOffset int, payloadEnd int) (byte, uint32, bool) {
-	if startOffset+5 > payloadEnd {
-		return 0, 0, false
-	}
-	firstSpawn := data[startOffset]
-	worldCount := binary.LittleEndian.Uint32(data[startOffset+1 : startOffset+5])
-	return firstSpawn, worldCount, true
+	end := startOffset + r.Position()
+	m.Raw = append([]byte(nil), data[startOffset:end]...)
+	return m, end, nil
 }

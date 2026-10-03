@@ -57,7 +57,10 @@ func SkillNames() []string {
 	return names
 }
 
-var playerStatNames = []string{
+// Constructors keep the 105-entry version 43 stat table.
+var playerStatNames = currentPlayerStatNames[:105]
+
+var currentPlayerStatNames = []string{
 	"Deaths",
 	"CraftsOrUpgrades",
 	"Builds",
@@ -163,17 +166,117 @@ var playerStatNames = []string{
 	"UsePowerQueen",
 	"UsePowerAshlands",
 	"UsePowerDeepNorth",
+	"DeathByCatapult",
+	"DeathByCinderFire",
+	"DeathByAshlandsOcean",
+	"DeathByIncinerator",
+	"CraftFood",
+	"CraftFoodBonus",
+	"CraftGrill",
+	"CraftGrillBurnt",
+	"CraftGrillBonus",
+	"CraftWeapon",
+	"CraftArmor",
+	"CraftTrinket",
+	"CraftAmmo",
+	"CraftMaterial",
+	"CraftTool",
+	"CraftTorch",
+	"CraftBait",
+	"CraftOther",
+	"HarvestCrop",
+	"HarvestBerry",
+	"HarvestMushroom",
+	"HarvestVine",
+	"HarvestBonus",
+	"ConsecutiveDaysSurvived",
+	"ConsecutiveDaysSurvivedMax",
+	"MaxBuildingHeight",
+	"MaxBuildingHeightWorld",
+	"MaxComfort",
+	"TreasureBuriedFound",
+	"TreasureDungeonFound",
+	"TreasureLocationFound",
+	"LeviathanSink",
+	"LavaLeviathanSink",
+	"ExploreNorth",
+	"ExploreSouth",
+	"ExploreEast",
+	"ExploreWest",
+	"ExploreNorthNoMap",
+	"ExploreSouthNoMap",
+	"ExploreEastNoMap",
+	"ExploreWestNoMap",
+	"BossKillMultiplayer",
+	"BossKillSolo",
+	"VillagePointsMax",
+	"DeepestDungeon",
+	"DistanceSailHelm",
+	"PlayerSpawn",
+	"DeathByTreeTier0",
+	"DeathByTreeTier1",
+	"DeathByTreeTier2",
+	"DeathByTreeTier3",
+	"DeathByTreeTier4",
+	"DeathByTreeTier5",
+	"FishHooked",
+	"FishLost",
+	"FishCaught",
+	"FishCaughtTier0",
+	"FishCaughtTier1",
+	"FishCaughtTier2",
+	"FishCaughtTier3",
+	"FishCaughtTier4",
+	"FishCaughtTier5",
+	"FishCaughtTier6",
+	"BuiltPieces",
+	"BuiltPiecesNoDebt",
+	"BuildPiecesRemoved",
+	"BuildClusterMisc",
+	"BuildClusterCrafting",
+	"BuildClusterBuilding",
+	"BuildClusterFloor",
+	"BuildClusterWall",
+	"BuildClusterRoof",
+	"BuildClusterArchitecture",
+	"BuildClusterFurniture",
+	"BuildClusterLighting",
+	"BuildClusterDecor",
+	"BuildClusterStorage",
+	"BuildClusterTransport",
+	"BuildClusterFood",
+	"BuildClusterMeads",
+	"BuildClusterFeasts",
+	"BuildClusterDefense",
+	"BuildClusterStacks",
+	"BuildClusterStairs",
+	"BuildClusterDoors",
+	"BuildClusterSeasonal",
+	"TamedPetting",
+	"TamedCommand",
+	"TreeFir",
+	"TreeOak",
+	"TreePine",
+	"TreeAshlands",
+	"TreeYggdrasilShoot",
+	"TreeSwamp",
+	"TreeBeech",
+	"TreeBirch",
+	"TreeSnowFir",
+	"TreeSnowPine",
+	"DeathByDrawBridge",
+	"DeathByAshlandsLava",
 }
 
 func playerStatName(index int) string {
-	if index < 0 || index >= len(playerStatNames) {
+	if index < 0 || index >= len(currentPlayerStatNames) {
 		return ""
 	}
-	return playerStatNames[index]
+	return currentPlayerStatNames[index]
 }
 
 func PlayerStatIndexByName(name string) (int, bool) {
-	for i, statName := range playerStatNames {
+	for i, statName := range currentPlayerStatNames {
 		if strings.EqualFold(statName, name) {
 			return i, true
 		}
@@ -183,5 +286,5 @@ func PlayerStatIndexByName(name string) (int, bool) {
 
 // PlayerStatNames returns known player stat names in saved stat order.
 func PlayerStatNames() []string {
-	return append([]string(nil), playerStatNames...)
+	return append([]string(nil), currentPlayerStatNames...)
 }

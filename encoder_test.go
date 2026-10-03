@@ -16,6 +16,7 @@ func TestEncodeFixtureRoundTripsByteForByte(t *testing.T) {
 		"Steam_111111_fenris bueller.fch",
 		"Steam_222222_bortson.fch",
 		"Steam_333333_tugen.fch",
+		"Steam_444444_nichael.fch",
 	}
 
 	for _, file := range files {
@@ -71,7 +72,7 @@ func TestEncodeSyntheticCharacterDecodes(t *testing.T) {
 	if got := decoded.PlayerStats[0].Value; got != character.PlayerStats[0].Value {
 		t.Fatalf("PlayerStats[0].Value = %v, want %v", got, character.PlayerStats[0].Value)
 	}
-	if decoded.Map.StoredLength != 3 || decoded.Map.CompressedLength != 3 {
+	if decoded.Map.StoredLength != 11 || decoded.Map.CompressedLength != 3 {
 		t.Fatalf("bad map metadata: %+v", decoded.Map)
 	}
 	if decoded.Player.Name != character.Player.Name {
@@ -419,7 +420,11 @@ func syntheticCharacter() *valheim.Character {
 
 func syntheticMapSection() []byte {
 	w := binary.NewWriter()
-	w.Uint32(3)
+	w.Bool(true)
+	w.Uint32(1)
+	w.Bytes(make([]byte, 59))
+	w.Bool(true)
+	w.Uint32(11)
 	w.Uint32(0)
 	w.Uint32(3)
 	raw := w.Data()

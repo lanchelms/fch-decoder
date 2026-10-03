@@ -1,6 +1,9 @@
 package valheim
 
-import "github.com/lanchelms/fch-decoder/binary"
+import (
+	"fmt"
+	"github.com/lanchelms/fch-decoder/binary"
+)
 
 type decoder interface {
 	Decode(*binary.Reader)
@@ -23,6 +26,9 @@ func readValue[T any, P pointerDecoder[T]](r *binary.Reader) T {
 
 func readList[T any, P pointerDecoder[T]](r *binary.Reader) []T {
 	count := r.Uint32()
+	if uint64(count) > uint64(r.Remaining()) {
+		panic(fmt.Errorf("fch: list count %d exceeds remaining %d bytes", count, r.Remaining()))
+	}
 	out := make([]T, 0, r.Capacity(count))
 	for range count {
 		out = append(out, readValue[T, P](r))
@@ -39,6 +45,9 @@ func writeList[T encoder](w *binary.Writer, values []T) {
 
 func readStringList(r *binary.Reader) []string {
 	count := r.Uint32()
+	if uint64(count) > uint64(r.Remaining()) {
+		panic(fmt.Errorf("fch: list count %d exceeds remaining %d bytes", count, r.Remaining()))
+	}
 	out := make([]string, 0, r.Capacity(count))
 	for range count {
 		out = append(out, r.String())

@@ -55,7 +55,7 @@ func TestPlayerStatName(t *testing.T) {
 		{name: "middle", index: 27, want: "TreeChops"},
 		{name: "last", index: len(playerStatNames) - 1, want: "UsePowerDeepNorth"},
 		{name: "negative", index: -1, want: ""},
-		{name: "too high", index: len(playerStatNames), want: ""},
+		{name: "too high", index: len(currentPlayerStatNames), want: ""},
 	}
 
 	for _, tt := range tests {

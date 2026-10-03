@@ -24,7 +24,15 @@ import (
 )
 
 var (
-	skillsDesc = prometheus.NewDesc(
+	worldKeyTimeDesc  = prometheus.NewDesc("valheim_character_world_key_time_seconds", "Saved Valheim character world key time seconds.", []string{"player", "group", "key", "setting"}, nil)
+	worldTimeDesc     = prometheus.NewDesc("valheim_character_world_time_seconds", "Saved Valheim character world time seconds.", []string{"player", "group", "world"}, nil)
+	piecesPlacedDesc  = prometheus.NewDesc("valheim_character_pieces_placed", "Saved Valheim character pieces placed.", []string{"player", "group", "piece"}, nil)
+	foodsEatenDesc    = prometheus.NewDesc("valheim_character_foods_eaten", "Saved Valheim character foods eaten.", []string{"player", "group", "food"}, nil)
+	pickablesDesc     = prometheus.NewDesc("valheim_character_pickables", "Saved Valheim character pickables.", []string{"player", "group", "pickable"}, nil)
+	itemsPickedUpDesc = prometheus.NewDesc("valheim_character_items_picked_up", "Saved Valheim character items picked up.", []string{"player", "group", "item"}, nil)
+	itemsCraftedDesc  = prometheus.NewDesc("valheim_character_items_crafted", "Saved Valheim character items crafted.", []string{"player", "group", "item"}, nil)
+	enemyKillsDesc    = prometheus.NewDesc("valheim_character_enemy_kills", "Saved Valheim character enemy kills.", []string{"player", "group", "modifier", "enemy"}, nil)
+	skillsDesc        = prometheus.NewDesc(
 		"valheim_character_skills",
 		"Valheim character skill levels.",
 		[]string{"player", "skill"},
@@ -44,8 +52,8 @@ var (
 	)
 	statsDesc = prometheus.NewDesc(
 		"valheim_character_stats",
-		"Selected Valheim character player stat counters.",
-		[]string{"player", "stat"},
+		"Saved Valheim character scalar values, including counters, maxima, and current state.",
+		[]string{"player", "group", "stat"},
 		nil,
 	)
 	distanceDesc = prometheus.NewDesc(
@@ -73,6 +81,14 @@ var (
 		nil,
 	)
 	allDescs = []*prometheus.Desc{
+		worldKeyTimeDesc,
+		worldTimeDesc,
+		piecesPlacedDesc,
+		foodsEatenDesc,
+		pickablesDesc,
+		itemsPickedUpDesc,
+		itemsCraftedDesc,
+		enemyKillsDesc,
 		skillsDesc,
 		craftingDesc,
 		enemiesDesc,
@@ -290,13 +306,18 @@ func newMetrics(character *valheim.Character) metrics {
 		}
 		out.add(skillsDesc, float64(skill.DisplayLevel), skill.Name)
 	}
+	if character.Version == 46 {
+		out.addGroups(character.StatGroups)
+		out.addCharacterState(character.Player)
+		return out
+	}
 	out.addStats(craftingDesc, character.Player.RecipeStats)
 	out.addStats(enemiesDesc, character.Player.EnemyStats)
 	for _, stat := range character.PlayerStats {
 		if !allowedPlayerStats[stat.Name] {
 			continue
 		}
-		out.add(statsDesc, float64(stat.Value), stat.Name)
+		out.add(statsDesc, float64(stat.Value), "RawStats", stat.Name)
 	}
 	out.addDistanceStats(character.PlayerStats)
 	out.addCharacterState(character.Player)
@@ -355,11 +376,11 @@ func (m *metrics) addDistanceStats(entries []valheim.StatEntry) {
 	m.add(distanceDesc, air, "Air")
 }
 
-func (m *metrics) add(desc *prometheus.Desc, value float64, label string) {
+func (m *metrics) add(desc *prometheus.Desc, value float64, labels ...string) {
 	m.samples = append(m.samples, sample{
 		desc:   desc,
 		value:  value,
-		labels: []string{m.player, label},
+		labels: append([]string{m.player}, labels...),
 	})
 }
 
@@ -383,9 +404,9 @@ func characterFiles(dir string) ([]string, error) {
 func cleanMetricLabel(value string, desc *prometheus.Desc) string {
 	value = strings.ReplaceAll(value, "$", "")
 	switch desc {
-	case craftingDesc:
+	case craftingDesc, itemsCraftedDesc, itemsPickedUpDesc, foodsEatenDesc:
 		return titleName(strings.TrimPrefix(value, "item_"))
-	case enemiesDesc:
+	case enemiesDesc, enemyKillsDesc:
 		return titleName(strings.TrimPrefix(value, "enemy_"))
 	default:
 		return value
@@ -402,4 +423,58 @@ func titleName(value string) string {
 		parts[i] = title.String(part)
 	}
 	return strings.Join(parts, "")
+}
+
+func (m *metrics) addGroups(groups []valheim.StatGroup) {
+	modifiers := []string{"MixedAndTotal", "Unarmed", "Magic", "Ranged", "Melee"}
+	for _, g := range groups {
+		for _, s := range g.Stats {
+			m.add(statsDesc, float64(s.Value), g.Name, s.Name)
+		}
+		for i, entries := range g.EnemyStats {
+			for _, e := range entries {
+				name := cleanMetricLabel(e.Name, enemyKillsDesc)
+				if name != "" {
+					m.add(enemyKillsDesc, float64(e.Value), g.Name, modifiers[i], name)
+				}
+			}
+		}
+		for _, table := range []struct {
+			desc    *prometheus.Desc
+			entries []valheim.StatEntry
+		}{
+			{itemsCraftedDesc, g.ItemsCrafted}, {itemsPickedUpDesc, g.ItemsPickedUp}, {pickablesDesc, g.Pickables}, {foodsEatenDesc, g.FoodsEaten}, {piecesPlacedDesc, g.PiecesPlaced},
+		} {
+			for _, e := range table.entries {
+				name := cleanMetricLabel(e.Name, table.desc)
+				if name != "" {
+					m.add(table.desc, float64(e.Value), g.Name, name)
+				}
+			}
+		}
+		for _, world := range g.KnownWorlds {
+			if world.Name != "" {
+				m.add(worldTimeDesc, float64(world.Seconds), g.Name, cleanMetricLabel(world.Name, worldTimeDesc))
+			}
+		}
+		m.addWorldKeys(g.Name, g.KnownWorldKeys)
+	}
+}
+
+func (m *metrics) addWorldKeys(group string, entries []valheim.WorldKey) {
+	totals := make(map[[2]string]float64)
+	for _, entry := range entries {
+		name, setting := entry.Key, entry.Setting
+		if entry.Raw != "" {
+			name, setting, _ = strings.Cut(strings.TrimSpace(entry.Raw), " ")
+		}
+		name = strings.TrimSpace(cleanMetricLabel(name, worldKeyTimeDesc))
+		setting = strings.TrimSpace(cleanMetricLabel(setting, worldKeyTimeDesc))
+		if name != "" {
+			totals[[2]string{name, setting}] += float64(entry.Seconds)
+		}
+	}
+	for labels, seconds := range totals {
+		m.add(worldKeyTimeDesc, seconds, group, labels[0], labels[1])
+	}
 }

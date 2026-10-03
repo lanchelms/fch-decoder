@@ -3,6 +3,8 @@ package valheim
 import "github.com/lanchelms/fch-decoder/binary"
 
 type Item struct {
+	PrefabHash  int32       `json:"prefabHash,omitempty"`
+	Cheated     bool        `json:"cheated"`
 	Name        string      `json:"name"`
 	Stack       int32       `json:"stack"`
 	Durability  float32     `json:"durability"`
@@ -16,6 +18,12 @@ type Item struct {
 	CustomData  []TextEntry `json:"customData,omitempty"`
 	WorldLevel  uint32      `json:"worldLevel"`
 	PickedUp    bool        `json:"pickedUp"`
+
+	compactFlags      byte
+	compactExtra      byte
+	compactDurability int32
+	compactDecoded    bool
+	compactWideCount  bool
 }
 
 func (i *Item) Decode(r *binary.Reader) {

@@ -52,7 +52,10 @@ func DecodeBytes(data []byte) (character *valheim.Character, err error) {
 	}
 
 	c := &valheim.Character{FileLength: fileLength}
-	c.Decode(rd)
+	payload := rd.Slice(0, payloadEnd)
+	payload.SetPosition(fileLengthSize)
+	c.Decode(payload)
+	rd.SetPosition(payloadEnd)
 	c.Trailer.Offset = payloadEnd
 	c.Trailer.Length = rd.Uint32()
 	if c.Trailer.Length != payloadHashSize {

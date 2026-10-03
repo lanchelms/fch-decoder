@@ -24,6 +24,7 @@ type Character struct {
 	FileLength       uint32      `json:"fileLength"`
 	Version          uint32      `json:"version"`
 	PlayerStatCount  uint32      `json:"playerStatCount"`
+	StatGroups       []StatGroup `json:"statGroups,omitempty"`
 	PlayerStats      []StatEntry `json:"playerStats,omitempty"`
 	Map              Map         `json:"map"`
 	HasPlayerData    bool        `json:"hasPlayerData"`
@@ -48,6 +49,9 @@ func NewCharacter(name string, playerID uint64) *Character {
 func (c *Character) Decode(r *binary.Reader) {
 	payloadStart := r.Position()
 	c.Version = r.Uint32()
+	if c.Version != 43 && c.Version != 46 {
+		panic(fmt.Errorf("unsupported character version %d", c.Version))
+	}
 	c.PlayerStatCount = r.Uint32()
 
 	payloadEnd := payloadStart + int(c.FileLength)
@@ -58,10 +62,25 @@ func (c *Character) Decode(r *binary.Reader) {
 		panic(fmt.Errorf("fch: player stat count %d exceeds payload size", c.PlayerStatCount))
 	}
 
-	c.PlayerStats = make([]StatEntry, 0, c.PlayerStatCount)
-	for i := 0; i < int(c.PlayerStatCount); i++ {
-		value := r.Float32()
-		c.PlayerStats = append(c.PlayerStats, StatEntry{Name: playerStatName(i), Value: value})
+	if c.Version == 46 {
+		if c.PlayerStatCount != 205 {
+			panic("fch: version 46 requires 205 stats")
+		}
+		if r.Uint32() != 10 {
+			panic("fch: version 46 requires ten stat groups")
+		}
+		for _, name := range statGroupNames {
+			g := StatGroup{Name: name}
+			g.Decode(r)
+			c.StatGroups = append(c.StatGroups, g)
+		}
+	} else {
+		c.PlayerStats = make([]StatEntry, 0, c.PlayerStatCount)
+		for i := 0; i < int(c.PlayerStatCount); i++ {
+			value := r.Float32()
+			c.PlayerStats = append(c.PlayerStats, StatEntry{Name: playerStatName(i), Value: value})
+		}
+
 	}
 
 	mapSection, playerOffset, err := readMapSection(r.Data(), r.Position(), payloadEnd)
@@ -71,25 +90,43 @@ func (c *Character) Decode(r *binary.Reader) {
 	c.Map = mapSection
 
 	pr := r.Slice(playerOffset, payloadEnd)
-	c.Player.Decode(pr)
+	c.Player.decodeVersion(pr, c.Version)
 	c.HasPlayerData = pr.Bool()
 	if c.HasPlayerData {
 		c.PlayerDataLength = pr.Uint32()
-		c.Player.PlayerState.Decode(pr)
-		c.Player.PlayerTail.Decode(pr)
+		playerData := binary.NewReader(pr.Bytes(int(c.PlayerDataLength)))
+		c.Player.PlayerState.Decode(playerData)
+		if (c.Version == 46 && (c.Player.PlayerVersion != 33 || c.Player.InventoryVersion != 109)) || (c.Version == 43 && (c.Player.PlayerVersion != 29 || c.Player.InventoryVersion != 106)) {
+			panic("fch: unsupported character/player/inventory layout")
+		}
+		c.Player.PlayerTail.decodeVersion(playerData, c.Player.PlayerVersion)
+		if playerData.Remaining() != 0 {
+			panic(fmt.Errorf("fch: %d unread embedded player bytes", playerData.Remaining()))
+		}
 	}
 	c.RemainingBytes = pr.Remaining()
+	if c.RemainingBytes != 0 {
+		panic(fmt.Errorf("fch: %d unread character bytes", c.RemainingBytes))
+	}
 	r.SetPosition(payloadEnd)
 }
 
 func (c Character) Encode(w *binary.Writer) {
 	w.Uint32(c.Version)
-	w.Uint32(uint32(len(c.PlayerStats)))
-	for _, stat := range c.PlayerStats {
-		w.Float32(stat.Value)
+	if c.Version == 46 {
+		w.Uint32(c.PlayerStatCount)
+		w.Uint32(uint32(len(c.StatGroups)))
+		for _, g := range c.StatGroups {
+			g.Encode(w)
+		}
+	} else {
+		w.Uint32(uint32(len(c.PlayerStats)))
+		for _, stat := range c.PlayerStats {
+			w.Float32(stat.Value)
+		}
 	}
 	w.Bytes(c.Map.Raw)
-	c.Player.Encode(w)
+	c.Player.encodeVersion(w, c.Version)
 	c.encodePlayerData(w)
 }
 
@@ -101,7 +138,7 @@ func (c Character) encodePlayerData(w *binary.Writer) {
 
 	playerData := binary.NewWriter()
 	c.Player.PlayerState.Encode(playerData)
-	c.Player.PlayerTail.Encode(playerData)
+	c.Player.PlayerTail.encodeVersion(playerData, c.Player.PlayerVersion)
 	data := playerData.Data()
 	if len(data) > math.MaxUint32 {
 		panic(fmt.Errorf("fch: player data too large: %d bytes", len(data)))
@@ -115,10 +152,20 @@ func (c *Character) Validate() error {
 	if c == nil {
 		return fmt.Errorf("fch: cannot encode nil character")
 	}
-	if c.Version != supportedCharacterVersion {
+	if c.Version != supportedCharacterVersion && c.Version != 46 {
 		return fmt.Errorf("unsupported character version %d", c.Version)
 	}
-	if c.PlayerStatCount != uint32(len(c.PlayerStats)) {
+	if c.Version == 46 {
+		if c.PlayerStatCount != 205 || len(c.StatGroups) != 10 {
+			return fmt.Errorf("invalid version 46 stat groups")
+		}
+		for index, g := range c.StatGroups {
+			if g.Name != statGroupNames[index] || len(g.Stats) != 205 || len(g.EnemyStats) != 5 {
+				return fmt.Errorf("invalid stat group %q", g.Name)
+			}
+		}
+	}
+	if c.Version == 43 && c.PlayerStatCount != uint32(len(c.PlayerStats)) {
 		return fmt.Errorf("fch: player stat count %d does not match %d stats", c.PlayerStatCount, len(c.PlayerStats))
 	}
 	if len(c.Map.Raw) == 0 {
@@ -130,7 +177,16 @@ func (c *Character) Validate() error {
 	if !c.HasPlayerData {
 		return nil
 	}
-	return c.Player.Validate()
+	if c.Version == 46 && c.Player.normalizedTailFloatCount() != 3 {
+		return fmt.Errorf("version 46 requires three player tail floats")
+	}
+	if err := c.Player.Validate(); err != nil {
+		return err
+	}
+	if (c.Version == 46 && (c.Player.PlayerVersion != 33 || c.Player.InventoryVersion != 109)) || (c.Version == 43 && (c.Player.PlayerVersion != 29 || c.Player.InventoryVersion != 106)) {
+		return fmt.Errorf("unsupported character/player/inventory layout")
+	}
+	return nil
 }
 
 // ValidateEditable verifies that the character matches the decoded file shape this package can safely edit.
@@ -251,26 +307,47 @@ func (c *Character) Skill(skillType int32) (Skill, bool) {
 
 // UpsertEnemyStat updates an enemy stat by case-insensitive name or appends it.
 func (c *Character) UpsertEnemyStat(name string, value float32) {
+	if c.Version == 46 {
+		upsertStat(&c.StatGroups[0].EnemyStats[0], name, value)
+		return
+	}
 	upsertStat(&c.Player.EnemyStats, name, value)
 }
 
 // EnemyStat returns an enemy stat by case-insensitive name.
 func (c *Character) EnemyStat(name string) (float32, bool) {
+	if c.Version == 46 {
+		return stat(c.StatGroups[0].EnemyStats[0], name)
+	}
 	return stat(c.Player.EnemyStats, name)
 }
 
 // UpsertMaterialStat updates a material stat by case-insensitive name or appends it.
 func (c *Character) UpsertMaterialStat(name string, value float32) {
+	if c.Version == 46 {
+		upsertStat(&c.StatGroups[0].ItemsPickedUp, name, value)
+		return
+	}
 	upsertStat(&c.Player.MaterialStats, name, value)
 }
 
 // MaterialStat returns a material stat by case-insensitive name.
 func (c *Character) MaterialStat(name string) (float32, bool) {
+	if c.Version == 46 {
+		return stat(c.StatGroups[0].ItemsPickedUp, name)
+	}
 	return stat(c.Player.MaterialStats, name)
 }
 
 // SetPlayerStat sets a player stat by index and keeps PlayerStatCount synchronized.
 func (c *Character) SetPlayerStat(index int, name string, value float32) error {
+	if c.Version == 46 {
+		if index < 0 || index >= 205 {
+			return fmt.Errorf("invalid stat index %d", index)
+		}
+		c.StatGroups[0].Stats[index] = StatEntry{Name: currentPlayerStatNames[index], Value: value}
+		return nil
+	}
 	if index < 0 {
 		return fmt.Errorf("invalid player stat index %d", index)
 	}

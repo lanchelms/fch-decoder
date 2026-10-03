@@ -74,3 +74,16 @@ func (w *Writer) write7BitEncodedInt(v int) {
 	}
 	w.Byte(byte(v))
 }
+
+func (w *Writer) Uint16(v uint16) { w.buf = binary.LittleEndian.AppendUint16(w.buf, v) }
+func (w *Writer) NumItems(n int) {
+	if n < 0 || n > 32767 {
+		panic("invalid compact item count")
+	}
+	if n < 128 {
+		w.Byte(byte(n))
+	} else {
+		w.Byte(byte(n>>8) | 128)
+		w.Byte(byte(n))
+	}
+}
