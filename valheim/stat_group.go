@@ -22,6 +22,24 @@ type StatGroup struct {
 	PiecesPlaced   []StatEntry   `json:"piecesPlaced,omitempty"`
 }
 
+// IsEmpty reports whether the group has only zero scalars and no saved history or activity.
+func (g StatGroup) IsEmpty() bool {
+	for _, stat := range g.Stats {
+		if stat.Value != 0 {
+			return false
+		}
+	}
+	for _, entries := range g.EnemyStats {
+		if len(entries) != 0 {
+			return false
+		}
+	}
+	return len(g.KnownWorlds) == 0 && len(g.KnownWorldKeys) == 0 &&
+		len(g.KnownCommands) == 0 && len(g.ItemsPickedUp) == 0 &&
+		len(g.ItemsCrafted) == 0 && len(g.Pickables) == 0 &&
+		len(g.FoodsEaten) == 0 && len(g.PiecesPlaced) == 0
+}
+
 func (g *StatGroup) Decode(r *binary.Reader) {
 	defer func() {
 		if failure := recover(); failure != nil {

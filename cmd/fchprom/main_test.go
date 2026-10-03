@@ -342,7 +342,7 @@ func TestMixedVersionRegisteredCollector(t *testing.T) {
 			t.Fatal("legacy group missing")
 		}
 	}
-	if len(groups) != 10 {
+	if len(groups) != 3 || groups["RawStats"] != 205 || groups["Any"] != 205 || groups["Default"] != 205 {
 		t.Fatalf("groups = %v", groups)
 	}
 	for g, n := range groups {
@@ -362,7 +362,7 @@ func TestMixedVersionRegisteredCollector(t *testing.T) {
 	assertMetricValue(t, stats, 34, map[string]string{"player": "Nichael", "group": "RawStats", "stat": "Deaths"})
 	assertMetricValue(t, stats, 0, map[string]string{"player": "Nichael", "group": "Default", "stat": "Deaths"})
 	for name, labels := range map[string][]string{
-		"enemy_kills": {"player", "group", "modifier", "enemy"}, "items_crafted": {"player", "group", "item"}, "items_picked_up": {"player", "group", "item"}, "foods_eaten": {"player", "group", "food"}, "pieces_placed": {"player", "group", "piece"}, "world_time_seconds": {"player", "group", "world"}, "world_key_time_seconds": {"player", "group", "key", "setting"},
+		"enemy_kills": {"player", "group", "modifier", "enemy"}, "items_crafted": {"player", "group", "item"}, "items_picked_up": {"player", "group", "item"}, "foods_eaten": {"player", "group", "food"}, "pieces_placed": {"player", "group", "piece"}, "world_time_seconds": {"player", "group", "world"}, "world_key_seconds": {"player", "group", "key", "setting"},
 	} {
 		family := got["valheim_character_"+name]
 		if name == "pickables" {
@@ -401,7 +401,7 @@ func TestGroupActivityAndWorldKeyMetrics(t *testing.T) {
 	for i, modifier := range []string{"MixedAndTotal", "Unarmed", "Magic", "Ranged", "Melee"} {
 		assertMetricValue(t, got["valheim_character_enemy_kills"], float64(i+1), map[string]string{"player": "Nichael", "group": "Default", "modifier": modifier, "enemy": "Greyling"})
 	}
-	assertMetricValue(t, got["valheim_character_world_key_time_seconds"], 14673, map[string]string{"player": "Nichael", "group": "RawStats", "key": "nomap", "setting": ""})
+	assertMetricValue(t, got["valheim_character_world_key_seconds"], 14673, map[string]string{"player": "Nichael", "group": "RawStats", "key": "nomap", "setting": ""})
 }
 
 func TestWorldKeyMetricsTrimAndSum(t *testing.T) {
@@ -425,7 +425,7 @@ func TestWorldKeyMetricsTrimAndSum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	family := metricFamilies(families)["valheim_character_world_key_time_seconds"]
+	family := metricFamilies(families)["valheim_character_world_key_seconds"]
 	if len(family.Metric) != 3 {
 		t.Fatalf("expected three normalized series, got %d", len(family.Metric))
 	}
@@ -434,5 +434,52 @@ func TestWorldKeyMetricsTrimAndSum(t *testing.T) {
 	assertMetricValue(t, family, 17, map[string]string{"player": "Trim", "group": "Default", "key": "nomap", "setting": ""})
 	if character.StatGroups[0].KnownWorldKeys[2].Raw != "  nomap  " {
 		t.Fatal("export changed the saved world key")
+	}
+}
+
+func TestEmptyStatGroupMetrics(t *testing.T) {
+	cases := []struct {
+		name     string
+		populate func(*valheim.StatGroup)
+	}{
+		{"empty", nil},
+		{"scalar", func(g *valheim.StatGroup) { g.Stats[1].Value = 1 }},
+		{"world", func(g *valheim.StatGroup) { g.KnownWorlds = []valheim.TimeEntry{{}} }},
+		{"world key", func(g *valheim.StatGroup) { g.KnownWorldKeys = []valheim.WorldKey{{}} }},
+		{"command", func(g *valheim.StatGroup) { g.KnownCommands = []valheim.StatEntry{{}} }},
+		{"enemy", func(g *valheim.StatGroup) { g.EnemyStats[4] = []valheim.StatEntry{{}} }},
+		{"picked up", func(g *valheim.StatGroup) { g.ItemsPickedUp = []valheim.StatEntry{{}} }},
+		{"crafted", func(g *valheim.StatGroup) { g.ItemsCrafted = []valheim.StatEntry{{}} }},
+		{"pickable", func(g *valheim.StatGroup) { g.Pickables = []valheim.StatEntry{{}} }},
+		{"food", func(g *valheim.StatGroup) { g.FoodsEaten = []valheim.StatEntry{{}} }},
+		{"piece", func(g *valheim.StatGroup) { g.PiecesPlaced = []valheim.StatEntry{{}} }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			group := valheim.StatGroup{Name: "Hardcore", Stats: []valheim.StatEntry{{Name: "Deaths"}, {Name: "Jumps"}}, EnemyStats: make([][]valheim.StatEntry, 5)}
+			if tc.populate != nil {
+				tc.populate(&group)
+			}
+			m := metrics{player: "Test"}
+			m.addGroups([]valheim.StatGroup{group})
+			if tc.populate == nil {
+				if len(m.samples) != 0 {
+					t.Fatalf("empty group emitted %d samples", len(m.samples))
+				}
+				return
+			}
+			stats := 0
+			for _, sample := range m.samples {
+				if sample.desc == statsDesc {
+					stats++
+					if sample.labels[2] == "Deaths" && sample.value != 0 {
+						t.Fatal("zero deaths changed")
+					}
+				}
+			}
+			if stats != 2 {
+				t.Fatalf("populated group emitted %d scalars, want 2", stats)
+			}
+		})
 	}
 }

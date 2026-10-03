@@ -148,8 +148,10 @@ Shared character metrics:
 The lowercase `group` label is an added label for legacy stats too: update queries
 and recording rules that depend on the previous label set. Legacy files retain
 the selected counters with `group="RawStats"`. Version 46 exports all 205 saved
-scalar values in each of its ten groups, including counters, maxima, and current
-state. The groups are `RawStats`, `Any`, `Hammer`, `Casual`, `VeryEasy`, `Easy`,
+scalar values in each populated group, including counters, maxima, and current
+state. Groups with all-zero scalars and empty history/activity tables are omitted;
+zero-valued scalars within populated groups are retained.
+The ten groups are `RawStats`, `Any`, `Hammer`, `Casual`, `VeryEasy`, `Easy`,
 `Default`, `Hard`, `VeryHard`, and `Hardcore`. They overlap: choose a group rather
 than summing across groups. Edits to overall stats affect only `RawStats` and do
 not fabricate achievement progress.
@@ -170,7 +172,7 @@ Version 46 instead exports these saved activity and history tables as gauges:
 - `valheim_character_foods_eaten{player,group,food}`
 - `valheim_character_pieces_placed{player,group,piece}`
 - `valheim_character_world_time_seconds{player,group,world}`
-- `valheim_character_world_key_time_seconds{player,group,key,setting}`
+- `valheim_character_world_key_seconds{player,group,key,setting}`
 
 Enemy modifiers are `MixedAndTotal`, `Unarmed`, `Magic`, `Ranged`, and `Melee`.
 Missing activities produce no series. World-key names and settings are trimmed

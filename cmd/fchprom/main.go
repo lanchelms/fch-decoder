@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	worldKeyTimeDesc  = prometheus.NewDesc("valheim_character_world_key_time_seconds", "Saved Valheim character world key time seconds.", []string{"player", "group", "key", "setting"}, nil)
+	worldKeyTimeDesc  = prometheus.NewDesc("valheim_character_world_key_seconds", "Saved Valheim character world key time seconds.", []string{"player", "group", "key", "setting"}, nil)
 	worldTimeDesc     = prometheus.NewDesc("valheim_character_world_time_seconds", "Saved Valheim character world time seconds.", []string{"player", "group", "world"}, nil)
 	piecesPlacedDesc  = prometheus.NewDesc("valheim_character_pieces_placed", "Saved Valheim character pieces placed.", []string{"player", "group", "piece"}, nil)
 	foodsEatenDesc    = prometheus.NewDesc("valheim_character_foods_eaten", "Saved Valheim character foods eaten.", []string{"player", "group", "food"}, nil)
@@ -428,6 +428,9 @@ func titleName(value string) string {
 func (m *metrics) addGroups(groups []valheim.StatGroup) {
 	modifiers := []string{"MixedAndTotal", "Unarmed", "Magic", "Ranged", "Melee"}
 	for _, g := range groups {
+		if g.IsEmpty() {
+			continue
+		}
 		for _, s := range g.Stats {
 			m.add(statsDesc, float64(s.Value), g.Name, s.Name)
 		}
